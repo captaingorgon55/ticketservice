@@ -102,17 +102,22 @@ export type EmailPayload = {
   ticketTitle: string;
   ticketUrl: string;
   bodyHtml: string;
+  extraRecipients?: string[];
 };
 
 /**
- * Send ticket notification to all configured recipients.
+ * Send ticket notification to all configured recipients plus any extra ones.
  * This runs asynchronously and swallows errors so it never blocks the API.
  */
 export async function notifyTicketActivity(payload: EmailPayload): Promise<void> {
-  if (!GMAIL_SENDER || !GMAIL_APP_PASSWORD || NOTIFY_EMAILS.length === 0) {
-    // Silently skip if not configured
-    return;
-  }
+  if (!GMAIL_SENDER || !GMAIL_APP_PASSWORD) return;
+
+  const recipients = [
+    ...NOTIFY_EMAILS,
+    ...(payload.extraRecipients ?? []),
+  ].filter(Boolean).filter((e, i, arr) => arr.indexOf(e) === i);
+
+  if (recipients.length === 0) return;
 
   const html = buildHtml(payload);
 
@@ -120,13 +125,12 @@ export async function notifyTicketActivity(payload: EmailPayload): Promise<void>
     const transporter = getTransporter();
     await transporter.sendMail({
       from: `"Help Desk IM" <${GMAIL_SENDER}>`,
-      to: NOTIFY_EMAILS.join(","),
+      to: recipients.join(","),
       subject: payload.subject,
       html,
     });
-    console.log(`[email] Sent: "${payload.subject}" to ${NOTIFY_EMAILS.length} recipients`);
+    console.log(`[email] Sent: "${payload.subject}" to ${recipients.length} recipients`);
   } catch (err) {
-    // Never throw — we don't want email failures to break the API
     console.error("[email] Failed to send:", err instanceof Error ? err.message : err);
   }
 }

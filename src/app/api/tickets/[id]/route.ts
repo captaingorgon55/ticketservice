@@ -128,11 +128,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (changes.length > 0) {
     const updaterName = session.user?.name ?? "—";
     const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
+
+    const extraRecipients: string[] = [];
+
+    const populatedTicket = populated as Record<string, unknown>;
+    const assignedUser = populatedTicket?.assignedTo as Record<string, unknown> | null;
+    const createdByUser = populatedTicket?.createdBy as Record<string, unknown> | null;
+
+    if (assignedUser?.email) extraRecipients.push(assignedUser.email as string);
+    if (createdByUser?.email) extraRecipients.push(createdByUser.email as string);
+
     notifyTicketActivity({
       subject: `✏️ Ticket #${ticket.ticketNumber} actualizado: ${ticket.title}`,
       ticketNumber: ticket.ticketNumber,
       ticketTitle: ticket.title,
       ticketUrl: `${APP_URL}/tickets/${id}`,
+      extraRecipients,
       bodyHtml: `
         <p style="font-size:13px;color:#666;margin:0 0 8px;">Actualizado por <strong style="color:#333;">${esc(updaterName)}</strong></p>
         <div style="padding:12px;background:#f9fafb;border-radius:8px;font-size:13px;color:#333;line-height:1.6;">${changes.map(c => esc(c)).join("<br>")}</div>

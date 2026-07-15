@@ -41,7 +41,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   await dbConnect();
-  const ticket = await Ticket.findById(id);
+  const ticket = await Ticket.findById(id)
+    .populate("assignedTo", "email")
+    .populate("createdBy", "email");
   if (!ticket) return NextResponse.json({ error: "Ticket no encontrado" }, { status: 404 });
 
   const comment = await TicketComment.create({
@@ -58,11 +60,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // ── Notificar comentario por correo ──
   const authorName = (populated as Record<string, unknown>)?.author as Record<string, unknown> | null;
   const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
+
+  const ticketAny = ticket as unknown as Record<string, unknown>;
+  const assignedUser = ticketAny.assignedTo as Record<string, unknown> | null;
+  const createdByUser = ticketAny.createdBy as Record<string, unknown> | null;
+  const extraRecipients = [assignedUser?.email, createdByUser?.email]
+    .filter((e): e is string => typeof e === "string" && e.length > 0);
+
   notifyTicketActivity({
     subject: `💬 Nuevo comentario en #${ticket.ticketNumber}: ${ticket.title}`,
     ticketNumber: ticket.ticketNumber,
     ticketTitle: ticket.title,
     ticketUrl: `${APP_URL}/tickets/${id}`,
+    extraRecipients,
     bodyHtml: `
       <p style="font-size:13px;color:#666;margin:0 0 4px;">
         <strong style="color:#333;">${esc(authorName?.name as string ?? "—")}</strong> comentó:

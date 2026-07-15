@@ -13,8 +13,11 @@ async function requireAuth() {
 
 /** GET /api/tickets — list tickets with filters */
 export async function GET(req: NextRequest) {
-  const denied = await requireAuth();
-  if (denied instanceof NextResponse) return denied;
+  const session = await requireAuth();
+  if (session instanceof NextResponse) return session;
+
+  const userId = (session.user as { id?: string; role?: string })?.id;
+  const role   = (session.user as { id?: string; role?: string })?.role;
 
   const { searchParams } = new URL(req.url);
   const status   = searchParams.get("status");
@@ -31,10 +34,16 @@ export async function GET(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const filter: Record<string, any> = { isActive: true };
 
+  // Analistas solo ven sus tickets asignados
+  if (role !== "admin") {
+    filter.assignedTo = userId;
+  } else {
+    if (assigned) filter.assignedTo = assigned === "unassigned" ? null : assigned;
+  }
+
   if (status)   filter.status   = { $in: status.split(",") };
   if (category) filter.category = { $in: category.split(",") };
   if (priority) filter.priority = { $in: priority.split(",") };
-  if (assigned) filter.assignedTo = assigned === "unassigned" ? null : assigned;
   if (created)  filter.createdBy  = created;
   if (q) {
     filter.$or = [

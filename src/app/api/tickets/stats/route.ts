@@ -8,9 +8,16 @@ export async function GET() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
+  const userId = (session.user as { id?: string; role?: string })?.id;
+  const role   = (session.user as { id?: string; role?: string })?.role;
+
   await dbConnect();
 
-  const allActive = await Ticket.find({ isActive: true }).lean();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const baseFilter: Record<string, any> = { isActive: true };
+  if (role !== "admin") baseFilter.assignedTo = userId;
+
+  const allActive = await Ticket.find(baseFilter).lean();
 
   const byStatus    = { abierto: 0, en_progreso: 0, en_revision: 0, resuelto: 0, cerrado: 0 };
   const byPriority  = { baja: 0, media: 0, alta: 0, critica: 0 };

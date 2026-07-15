@@ -7,11 +7,11 @@ export function getGemini() {
   return new GoogleGenerativeAI(apiKey);
 }
 
-export function getModel(modelName = "gemini-2.5-flash") {
+export function getModel(modelName = "gemini-2.0-flash") {
   return getGemini().getGenerativeModel({ model: modelName });
 }
 
-export function getJsonModel(modelName = "gemini-2.5-flash") {
+export function getJsonModel(modelName = "gemini-2.0-flash") {
   return getGemini().getGenerativeModel({
     model: modelName,
     generationConfig: { responseMimeType: "application/json" },

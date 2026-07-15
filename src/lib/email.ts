@@ -3,7 +3,7 @@ import { Resend } from "resend";
 // ── Config ──────────────────────────────────────────
 
 const RESEND_API_KEY  = process.env.RESEND_API_KEY ?? "";
-const EMAIL_FROM      = process.env.EMAIL_FROM ?? "Help Desk IM <onboarding@resend.dev>";
+const EMAIL_FROM      = process.env.EMAIL_FROM ?? "Solicitudes IM <onboarding@resend.dev>";
 
 const NOTIFY_EMAILS = (process.env.NOTIFY_EMAILS ?? "")
   .split(",")

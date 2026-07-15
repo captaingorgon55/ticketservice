@@ -36,7 +36,7 @@ export function Sidebar() {
           HD
         </div>
         <div>
-          <p className="text-sm font-bold text-gray-900 leading-tight">Help Desk</p>
+          <p className="text-sm font-bold text-gray-900 leading-tight">Solicitudes IM</p>
           <p className="text-xs text-gray-400">Inteligencia de Mercados</p>
         </div>
       </div>

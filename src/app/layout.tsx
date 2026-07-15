@@ -3,8 +3,8 @@ import "./globals.css";
 import { Providers } from "@/components/Providers";
 
 export const metadata: Metadata = {
-  title: "Help Desk — Inteligencia de Mercados",
-  description: "Mesa de ayuda para el equipo de Inteligencia de Mercados",
+  title: "Solicitudes IM",
+  description: "Gestión de solicitudes del equipo de Inteligencia de Mercados",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

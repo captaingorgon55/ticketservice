@@ -4,6 +4,70 @@ import dbConnect from "@/lib/dbConnect";
 import { Ticket, getNextTicketNumber } from "@/models/Ticket";
 import { TicketComment } from "@/models/TicketComment";
 import { notifyTicketActivity, esc } from "@/lib/email";
+import { User } from "@/models/User";
+import { getJsonModel } from "@/lib/gemini";
+
+// ── AI auto-assignment ──────────────────────────────
+
+async function aiAutoAssign(ticket: {
+  title: string;
+  description: string;
+  category: string;
+}): Promise<{ userId: string; userName: string; reason: string } | null> {
+  try {
+    const analysts = await User.find({ isActive: true, role: "analista" })
+      .select("_id name area")
+      .lean();
+
+    if (analysts.length === 0) return null;
+
+    // Get open ticket count per analyst
+    const workload = await Promise.all(
+      analysts.map(async (a) => {
+        const open = await Ticket.countDocuments({
+          assignedTo: a._id,
+          isActive: true,
+          status: { $in: ["abierto", "en_progreso", "en_revision"] },
+        });
+        return { id: String(a._id), name: a.name, area: a.area ?? "", open };
+      })
+    );
+
+    const model = getJsonModel("gemini-2.5-flash");
+    const prompt = `Eres un sistema de asignación de tickets de help desk para el equipo de Inteligencia de Mercados de un periódico.
+
+Ticket a asignar:
+- Título: ${ticket.title}
+- Categoría: ${ticket.category}
+- Descripción: ${ticket.description}
+
+Analistas disponibles:
+${workload.map((w) => `- ID: ${w.id} | Nombre: ${w.name} | Área: ${w.area} | Tickets activos: ${w.open}`).join("\n")}
+
+Asigna el ticket al analista más adecuado según:
+1. Relevancia del área con el tipo de ticket
+2. Menor carga de trabajo actual
+3. Especialización en la categoría
+
+Responde SOLO con este JSON (sin markdown):
+{"userId":"<id_del_analista>","userName":"<nombre>","reason":"<razón breve en español>"}`;
+
+    const result = await model.generateContent(prompt);
+    const parsed = JSON.parse(result.response.text()) as {
+      userId: string;
+      userName: string;
+      reason: string;
+    };
+
+    const valid = workload.find((w) => w.id === parsed.userId);
+    if (!valid) return null;
+
+    return parsed;
+  } catch (err) {
+    console.error("[auto-assign] Error:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
 
 async function requireAuth() {
   const session = await auth();
@@ -102,6 +166,19 @@ export async function POST(req: NextRequest) {
   await dbConnect();
   const ticketNumber = await getNextTicketNumber();
 
+  // Auto-asignar con IA si no se especificó un analista
+  let finalAssignedTo: string | null = assignedTo || null;
+  let autoAssignment: { userId: string; userName: string; reason: string } | null = null;
+
+  if (!finalAssignedTo && process.env.GEMINI_API_KEY) {
+    autoAssignment = await aiAutoAssign({
+      title: title.trim(),
+      description: description.trim(),
+      category,
+    });
+    if (autoAssignment) finalAssignedTo = autoAssignment.userId;
+  }
+
   const ticket = await Ticket.create({
     ticketNumber,
     title: title.trim(),
@@ -109,7 +186,7 @@ export async function POST(req: NextRequest) {
     category,
     source: resolvedSource,
     createdBy: userId,
-    assignedTo: assignedTo || null,
+    assignedTo: finalAssignedTo,
     tags: tags ?? [],
     dueDate: dueDate ? new Date(dueDate) : null,
     journalistName:       journalistName?.trim() || null,
@@ -127,6 +204,16 @@ export async function POST(req: NextRequest) {
     type: "system",
     metadata: { action: "created", category },
   });
+
+  if (autoAssignment) {
+    await TicketComment.create({
+      ticket: ticket._id,
+      author: userId,
+      content: `🤖 Auto-asignado a ${autoAssignment.userName}: ${autoAssignment.reason}`,
+      type: "system",
+      metadata: { action: "auto-assigned", assignedTo: autoAssignment.userId },
+    });
+  }
 
   const populated = await Ticket.findById(ticket._id)
     .populate("createdBy", "name email role")

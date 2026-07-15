@@ -1,23 +1,14 @@
-import { Resend } from "resend";
+import sgMail from "@sendgrid/mail";
 
 // ── Config ──────────────────────────────────────────
 
-const RESEND_API_KEY  = process.env.RESEND_API_KEY ?? "";
-const EMAIL_FROM      = process.env.EMAIL_FROM ?? "Solicitudes IM <onboarding@resend.dev>";
+const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY ?? "";
+const EMAIL_FROM       = process.env.EMAIL_FROM ?? "Solicitudes IM <noreply@elespectador.com>";
 
 const NOTIFY_EMAILS = (process.env.NOTIFY_EMAILS ?? "")
   .split(",")
   .map((e) => e.trim())
   .filter(Boolean);
-
-// ── Client (lazy singleton) ─────────────────────────
-
-let _resend: Resend | null = null;
-
-function getResend() {
-  if (!_resend) _resend = new Resend(RESEND_API_KEY);
-  return _resend;
-}
 
 // ── HTML template ───────────────────────────────────
 
@@ -41,7 +32,7 @@ function buildHtml(opts: {
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td>
-                  <h1 style="margin:0;font-size:18px;font-weight:700;color:#fff;">Help Desk · IM</h1>
+                  <h1 style="margin:0;font-size:18px;font-weight:700;color:#fff;">Solicitudes IM</h1>
                   <p style="margin:4px 0 0;font-size:13px;color:rgba(255,255,255,0.8);">Inteligencia de Mercados</p>
                 </td>
                 <td align="right" style="vertical-align:bottom;">
@@ -62,8 +53,7 @@ function buildHtml(opts: {
         </td></tr>
         <tr><td style="padding:16px 28px;border-top:1px solid #eee;">
           <p style="margin:0;font-size:11px;color:#999;">
-            Este es un mensaje automático del Help Desk de Inteligencia de Mercados.
-            No responder a este correo.
+            Mensaje automático de Solicitudes IM · Inteligencia de Mercados. No responder.
           </p>
         </td></tr>
       </table>
@@ -94,12 +84,8 @@ export type EmailPayload = {
   extraRecipients?: string[];
 };
 
-/**
- * Send ticket notification via Resend.
- * Runs asynchronously and swallows errors so it never blocks the API.
- */
 export async function notifyTicketActivity(payload: EmailPayload): Promise<void> {
-  if (!RESEND_API_KEY) return;
+  if (!SENDGRID_API_KEY) return;
 
   const recipients = [
     ...NOTIFY_EMAILS,
@@ -108,17 +94,17 @@ export async function notifyTicketActivity(payload: EmailPayload): Promise<void>
 
   if (recipients.length === 0) return;
 
-  const html = buildHtml(payload);
-
   try {
-    const resend = getResend();
-    const { error } = await resend.emails.send({
+    sgMail.setApiKey(SENDGRID_API_KEY);
+    const html = buildHtml(payload);
+
+    await sgMail.send({
       from: EMAIL_FROM,
       to: recipients,
       subject: payload.subject,
       html,
     });
-    if (error) throw new Error(error.message);
+
     console.log(`[email] Sent: "${payload.subject}" to ${recipients.length} recipients`);
   } catch (err) {
     console.error("[email] Failed to send:", err instanceof Error ? err.message : err);

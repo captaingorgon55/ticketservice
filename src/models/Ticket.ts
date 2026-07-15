@@ -40,7 +40,7 @@ export interface ITicket {
 
 const TicketSchema = new Schema<ITicket>(
   {
-    ticketNumber: { type: Number, required: true, unique: true },
+    ticketNumber: { type: Number, required: true },
     title:        { type: String, required: true, trim: true, maxlength: 200 },
     description:  { type: String, required: true, maxlength: 5000 },
     category: {

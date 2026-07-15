@@ -44,7 +44,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   }
 
   try {
-    const model = getJsonModel("gemini-2.5-flash");
+    const model = getJsonModel("gemini-2.0-flash");
 
     const ticketContext = [
       `## Ticket #${ticket.ticketNumber}`,

@@ -1,0 +1,39 @@
+# render.yaml — Config for Render deployment
+#
+# ⚠️ IMPORTANTE: Necesitas MongoDB. Usa MongoDB Atlas (gratis):
+#    https://www.mongodb.com/atlas → Create → copia tu connection string
+#
+# ── Opción A: DOCKER (plan Starter+ de Render ~$7/mes) ──
+#   Render detectará el Dockerfile automáticamente.
+#
+# services:
+#   - type: web
+#     name: helpdesk-im
+#     runtime: docker
+#     dockerfilePath: ./Dockerfile
+#     healthCheckPath: /api/health
+#
+# ── Opción B: NODE RUNTIME (plan FREE de Render) ──
+#   En Render Dashboard → New Web Service → Connect repo → Manual:
+#
+#   Build Command:
+#     npm install && npm run build
+#
+#   Start Command:
+#     npx tsx scripts/seed.ts && node .next/standalone/server.js
+#
+#   Health Check Path:
+#     /api/health
+#
+# ── Env vars (OBLIGATORIAS) ─────────────────────
+#   MONGODB_URI=mongodb+srv://...
+#   NEXTAUTH_URL=https://TU_APP.onrender.com
+#   APP_URL=https://TU_APP.onrender.com
+#   NEXTAUTH_SECRET=<genera un texto aleatorio largo>
+#   SEED_PASSWORD=<contraseña-para-seed>
+#
+# ── Env vars (OPCIONALES) ───────────────────────
+#   GMAIL_SENDER=tu_correo@gmail.com
+#   GMAIL_APP_PASSWORD=<tu-gmail-app-password>
+#   NOTIFY_EMAILS=correo1@ejemplo.com,correo2@ejemplo.com
+#   GEMINI_API_KEY=<tu-key-de-gemini>

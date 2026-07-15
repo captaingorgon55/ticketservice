@@ -31,6 +31,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/src/models ./src/models
 
 # Copy node_modules for seed script (bcrypt/mongoose)
 COPY --from=builder /app/node_modules ./node_modules

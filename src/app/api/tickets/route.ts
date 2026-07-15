@@ -34,9 +34,9 @@ export async function GET(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const filter: Record<string, any> = { isActive: true };
 
-  // Analistas solo ven sus tickets asignados
+  // Analistas ven tickets que les asignaron O que ellos crearon
   if (role !== "admin") {
-    filter.assignedTo = userId;
+    filter.$or = [{ assignedTo: userId }, { createdBy: userId }];
   } else {
     if (assigned) filter.assignedTo = assigned === "unassigned" ? null : assigned;
   }

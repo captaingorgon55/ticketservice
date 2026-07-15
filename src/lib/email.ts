@@ -1,30 +1,22 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
 // ── Config ──────────────────────────────────────────
 
-const GMAIL_SENDER = process.env.GMAIL_SENDER ?? "";
-const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD ?? "";
+const RESEND_API_KEY  = process.env.RESEND_API_KEY ?? "";
+const EMAIL_FROM      = process.env.EMAIL_FROM ?? "Help Desk IM <onboarding@resend.dev>";
 
 const NOTIFY_EMAILS = (process.env.NOTIFY_EMAILS ?? "")
   .split(",")
   .map((e) => e.trim())
   .filter(Boolean);
 
-// ── Transport (lazy singleton) ──────────────────────
+// ── Client (lazy singleton) ─────────────────────────
 
-let _transporter: nodemailer.Transporter | null = null;
+let _resend: Resend | null = null;
 
-function getTransporter() {
-  if (!_transporter) {
-    _transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: GMAIL_SENDER,
-        pass: GMAIL_APP_PASSWORD,
-      },
-    });
-  }
-  return _transporter;
+function getResend() {
+  if (!_resend) _resend = new Resend(RESEND_API_KEY);
+  return _resend;
 }
 
 // ── HTML template ───────────────────────────────────
@@ -44,7 +36,6 @@ function buildHtml(opts: {
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:24px 0;">
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
-        <!-- Header -->
         <tr>
           <td style="background:#dc2626;padding:20px 28px;">
             <table width="100%" cellpadding="0" cellspacing="0">
@@ -62,7 +53,6 @@ function buildHtml(opts: {
             </table>
           </td>
         </tr>
-        <!-- Body -->
         <tr><td style="padding:28px;">
           <h2 style="margin:0 0 4px;font-size:16px;font-weight:700;color:#1a1a1a;">${opts.subject}</h2>
           <p style="margin:0 0 16px;font-size:13px;color:#666;">
@@ -70,7 +60,6 @@ function buildHtml(opts: {
           </p>
           ${opts.bodyHtml}
         </td></tr>
-        <!-- Footer -->
         <tr><td style="padding:16px 28px;border-top:1px solid #eee;">
           <p style="margin:0;font-size:11px;color:#999;">
             Este es un mensaje automático del Help Desk de Inteligencia de Mercados.
@@ -84,7 +73,7 @@ function buildHtml(opts: {
 </html>`;
 }
 
-// ── HTML escaping ──────────────────────────────────
+// ── HTML escaping ───────────────────────────────────
 
 export function esc(str: string): string {
   return str
@@ -106,11 +95,11 @@ export type EmailPayload = {
 };
 
 /**
- * Send ticket notification to all configured recipients plus any extra ones.
- * This runs asynchronously and swallows errors so it never blocks the API.
+ * Send ticket notification via Resend.
+ * Runs asynchronously and swallows errors so it never blocks the API.
  */
 export async function notifyTicketActivity(payload: EmailPayload): Promise<void> {
-  if (!GMAIL_SENDER || !GMAIL_APP_PASSWORD) return;
+  if (!RESEND_API_KEY) return;
 
   const recipients = [
     ...NOTIFY_EMAILS,
@@ -122,13 +111,14 @@ export async function notifyTicketActivity(payload: EmailPayload): Promise<void>
   const html = buildHtml(payload);
 
   try {
-    const transporter = getTransporter();
-    await transporter.sendMail({
-      from: `"Help Desk IM" <${GMAIL_SENDER}>`,
-      to: recipients.join(","),
+    const resend = getResend();
+    const { error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      to: recipients,
       subject: payload.subject,
       html,
     });
+    if (error) throw new Error(error.message);
     console.log(`[email] Sent: "${payload.subject}" to ${recipients.length} recipients`);
   } catch (err) {
     console.error("[email] Failed to send:", err instanceof Error ? err.message : err);

@@ -195,7 +195,7 @@ export default function TicketDetailPage() {
         const res = await fetch("/api/upload", { method: "POST", body: fd });
         const data = await res.json() as { url?: string; error?: string };
         if (!res.ok || !data.url) throw new Error(data.error ?? "Error al subir");
-        return { name: file.name, url: data.url, type: file.type };
+        return { name: file.name, url: data.url, fileType: file.type };
       }));
       await updateMut.mutateAsync({ addAttachments: uploaded });
       setNewFiles([]);
@@ -571,7 +571,7 @@ export default function TicketDetailPage() {
                 const res = await fetch("/api/upload", { method: "POST", body: fd });
                 const data = await res.json() as { url?: string; error?: string };
                 if (!data.url) throw new Error(data.error ?? "Error al subir");
-                return { name: f.name, url: data.url, type: f.type };
+                return { name: f.name, url: data.url, fileType: f.type };
               }));
             }
             await commentMut.mutateAsync({ content, attachments });

@@ -173,7 +173,7 @@ async function uploadFile(file: File): Promise<{ name: string; url: string; type
   const res = await fetch("/api/upload", { method: "POST", body: fd });
   const data = await res.json() as { url?: string; error?: string };
   if (!res.ok || !data.url) throw new Error(data.error ?? "Error al subir archivo");
-  return { name: file.name, url: data.url, type: file.type };
+  return { name: file.name, url: data.url, fileType: file.type };
 }
 
 function CreateTicketModal({ onClose }: { onClose: () => void }) {

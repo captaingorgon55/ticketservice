@@ -1,5 +1,11 @@
 import mongoose, { Schema, model, models } from "mongoose";
 
+// Schema explícito para evitar conflicto con la palabra reservada "type" de Mongoose
+const AttachmentSchema = new Schema(
+  { name: { type: String }, url: { type: String }, fileType: { type: String } },
+  { _id: false }
+);
+
 export type TicketCategory =
   | "analisis" | "insights" | "estrategia" | "datos"
   | "reporte"  | "soporte"  | "otro";
@@ -35,7 +41,7 @@ export interface ITicket {
   baseText: string | null;
   mustInclude: string | null;
   supportingMaterials: string | null;
-  attachments: { name: string; url: string; type: string }[];
+  attachments: { name: string; url: string; fileType: string }[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -83,10 +89,7 @@ const TicketSchema = new Schema<ITicket>(
     baseText:             { type: String, default: null, maxlength: 10000 },
     mustInclude:          { type: String, default: null, maxlength: 3000 },
     supportingMaterials:  { type: String, default: null, maxlength: 5000 },
-  attachments: {
-    type: [{ name: String, url: String, type: String }],
-    default: [],
-  },
+  attachments: { type: [AttachmentSchema], default: [] },
   },
   { timestamps: true }
 );

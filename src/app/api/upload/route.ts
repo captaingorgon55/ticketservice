@@ -52,5 +52,5 @@ export async function POST(req: NextRequest) {
   }
 
   console.log(`[upload] ${file.name} → ${folder}`);
-  return NextResponse.json({ url: data.secure_url, name: file.name, type: file.type });
+  return NextResponse.json({ url: data.secure_url, name: file.name, fileType: file.type });
 }

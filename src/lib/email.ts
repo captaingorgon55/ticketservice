@@ -33,10 +33,17 @@ function buildHtml(opts: {
         </td></tr>
         <tr><td style="padding:28px;">
           <h2 style="margin:0 0 4px;font-size:16px;font-weight:700;color:#1a1a1a;">${opts.subject}</h2>
-          <p style="margin:0 0 16px;font-size:13px;color:#666;">
-            <a href="${opts.ticketUrl}" style="color:#dc2626;text-decoration:none;">${opts.ticketTitle}</a>
-          </p>
+          <p style="margin:0 0 16px;font-size:13px;color:#666;">${opts.ticketTitle}</p>
           ${opts.bodyHtml}
+          <div style="margin-top:24px;text-align:center;">
+            <a href="${opts.ticketUrl}"
+               style="display:inline-block;padding:11px 28px;background:#dc2626;color:#fff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;letter-spacing:0.01em;">
+              Ver ticket →
+            </a>
+          </div>
+          <p style="margin:12px 0 0;font-size:11px;color:#bbb;text-align:center;">
+            Si el botón no funciona, copia este enlace: <a href="${opts.ticketUrl}" style="color:#dc2626;">${opts.ticketUrl}</a>
+          </p>
         </td></tr>
         <tr><td style="padding:16px 28px;border-top:1px solid #eee;">
           <p style="margin:0;font-size:11px;color:#999;">Mensaje automático · Solicitudes IM · No responder.</p>

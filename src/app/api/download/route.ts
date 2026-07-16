@@ -25,7 +25,12 @@ export async function GET(req: NextRequest) {
   const match = rawUrl.match(/\/(?:image|raw|video)\/(?:upload|authenticated)\/(?:v\d+\/)?(.+)$/);
   if (!match) return new NextResponse("URL inválida", { status: 400 });
 
-  const publicId  = match[1].replace(/\.[^.]+$/, ""); // sin extensión
+  // Raw files: la extensión ES parte del public_id en Cloudinary
+  // Image files: la extensión NO es parte del public_id
+  const resourceType = rawUrl.includes("/raw/") ? "raw" : rawUrl.includes("/video/") ? "video" : "image";
+  const publicId = resourceType === "raw"
+    ? match[1]                          // mantener extensión para raw
+    : match[1].replace(/\.[^.]+$/, ""); // quitar extensión para imágenes
   const timestamp = Math.floor(Date.now() / 1000).toString();
 
   // Firma para el endpoint de download
@@ -35,9 +40,6 @@ export async function GET(req: NextRequest) {
   const signature = Array.from(new Uint8Array(hashBuf))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
-
-  // Determinar el resource_type desde la URL
-  const resourceType = rawUrl.includes("/raw/") ? "raw" : rawUrl.includes("/video/") ? "video" : "image";
 
   // URL de descarga autenticada de Cloudinary
   const downloadUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${resourceType}/download` +

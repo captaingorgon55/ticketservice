@@ -1,24 +1,13 @@
-import nodemailer from "nodemailer";
+// ── Config ──────────────────────────────────────────
 
-const GMAIL_SENDER       = process.env.GMAIL_SENDER ?? "";
-const GMAIL_APP_PASSWORD = (process.env.GMAIL_APP_PASSWORD ?? "").replace(/\s/g, "");
+const INSIDER_API_KEY = process.env.INSIDER_API_KEY ?? "";
+const EMAIL_FROM_NAME  = "Solicitudes IM";
+const EMAIL_FROM_EMAIL = process.env.EMAIL_FROM ?? "noreply@elespectador.com";
 
 const NOTIFY_EMAILS = (process.env.NOTIFY_EMAILS ?? "")
   .split(",").map((e) => e.trim()).filter(Boolean);
 
-let _transporter: nodemailer.Transporter | null = null;
-
-function getTransporter() {
-  if (!_transporter) {
-    _transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 587,
-      secure: false,
-      auth: { user: GMAIL_SENDER, pass: GMAIL_APP_PASSWORD },
-    });
-  }
-  return _transporter;
-}
+// ── HTML template ───────────────────────────────────
 
 function buildHtml(opts: {
   subject: string; ticketNumber: number; ticketTitle: string;
@@ -30,8 +19,15 @@ function buildHtml(opts: {
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
         <tr><td style="background:#dc2626;padding:20px 28px;">
-          <h1 style="margin:0;font-size:18px;font-weight:700;color:#fff;">Solicitudes IM</h1>
-          <p style="margin:4px 0 0;font-size:13px;color:rgba(255,255,255,0.8);">Ticket #${opts.ticketNumber}</p>
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td><h1 style="margin:0;font-size:18px;font-weight:700;color:#fff;">Solicitudes IM</h1>
+              <p style="margin:4px 0 0;font-size:13px;color:rgba(255,255,255,0.8);">Inteligencia de Mercados</p></td>
+              <td align="right" style="vertical-align:bottom;">
+                <span style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.9);background:rgba(0,0,0,0.15);padding:4px 10px;border-radius:6px;">#${opts.ticketNumber}</span>
+              </td>
+            </tr>
+          </table>
         </td></tr>
         <tr><td style="padding:28px;">
           <h2 style="margin:0 0 4px;font-size:16px;font-weight:700;color:#1a1a1a;">${opts.subject}</h2>
@@ -40,15 +36,22 @@ function buildHtml(opts: {
           </p>
           ${opts.bodyHtml}
         </td></tr>
+        <tr><td style="padding:16px 28px;border-top:1px solid #eee;">
+          <p style="margin:0;font-size:11px;color:#999;">Mensaje automático · Solicitudes IM · No responder.</p>
+        </td></tr>
       </table>
     </td></tr>
   </table>
 </body></html>`;
 }
 
+// ── HTML escaping ───────────────────────────────────
+
 export function esc(str: string): string {
   return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
+
+// ── Public API ──────────────────────────────────────
 
 export type EmailPayload = {
   subject: string; ticketNumber: number; ticketTitle: string;
@@ -57,7 +60,7 @@ export type EmailPayload = {
 };
 
 export async function notifyTicketActivity(payload: EmailPayload): Promise<void> {
-  if (!GMAIL_SENDER || !GMAIL_APP_PASSWORD) return;
+  if (!INSIDER_API_KEY) return;
 
   const base = payload.onlyDirect ? [] : NOTIFY_EMAILS;
   const recipients = [...base, ...(payload.extraRecipients ?? [])]
@@ -67,15 +70,30 @@ export async function notifyTicketActivity(payload: EmailPayload): Promise<void>
 
   if (recipients.length === 0) return;
 
+  const html = buildHtml(payload);
+
   try {
-    const html = buildHtml(payload);
-    await getTransporter().sendMail({
-      from: `"Solicitudes IM" <${GMAIL_SENDER}>`,
-      to: recipients.join(","),
-      subject: payload.subject,
-      html,
+    const res = await fetch("https://mail.useinsider.com/mail/v1/send", {
+      method: "POST",
+      headers: {
+        "X-INS-AUTH-KEY": INSIDER_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        subject: payload.subject,
+        from: { name: EMAIL_FROM_NAME, email: EMAIL_FROM_EMAIL },
+        tos: recipients.map((email) => ({ email, name: email.split("@")[0] })),
+        content: [{ type: "text/html", value: html }],
+      }),
     });
-    console.log(`[email] Sent: "${payload.subject}" to ${recipients.length} recipients`);
+
+    const data = await res.json() as { status_message?: string; message?: string; errors?: string[] };
+
+    if (!res.ok) {
+      console.error("[email] Insider error:", JSON.stringify(data));
+    } else {
+      console.log(`[email] Sent via Insider: "${payload.subject}" to ${recipients.length} recipients`);
+    }
   } catch (err) {
     console.error("[email] Failed to send:", err instanceof Error ? err.message : String(err));
   }

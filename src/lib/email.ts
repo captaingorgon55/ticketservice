@@ -1,14 +1,33 @@
-import sgMail from "@sendgrid/mail";
+import nodemailer from "nodemailer";
 
 // ── Config ──────────────────────────────────────────
 
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY ?? "";
-const EMAIL_FROM       = process.env.EMAIL_FROM ?? "Solicitudes IM <noreply@elespectador.com>";
+const GMAIL_SENDER       = process.env.GMAIL_SENDER ?? "";
+const GMAIL_APP_PASSWORD = (process.env.GMAIL_APP_PASSWORD ?? "").replace(/\s/g, "");
 
 const NOTIFY_EMAILS = (process.env.NOTIFY_EMAILS ?? "")
   .split(",")
   .map((e) => e.trim())
   .filter(Boolean);
+
+// ── Transport (lazy singleton) ──────────────────────
+
+let _transporter: nodemailer.Transporter | null = null;
+
+function getTransporter() {
+  if (!_transporter) {
+    _transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,
+      auth: {
+        user: GMAIL_SENDER,
+        pass: GMAIL_APP_PASSWORD,
+      },
+    });
+  }
+  return _transporter;
+}
 
 // ── HTML template ───────────────────────────────────
 
@@ -82,12 +101,11 @@ export type EmailPayload = {
   ticketUrl: string;
   bodyHtml: string;
   extraRecipients?: string[];
-  /** Si true, solo envía a extraRecipients (ignora NOTIFY_EMAILS) */
   onlyDirect?: boolean;
 };
 
 export async function notifyTicketActivity(payload: EmailPayload): Promise<void> {
-  if (!SENDGRID_API_KEY) return;
+  if (!GMAIL_SENDER || !GMAIL_APP_PASSWORD) return;
 
   const base = payload.onlyDirect ? [] : NOTIFY_EMAILS;
   const recipients = [
@@ -98,16 +116,14 @@ export async function notifyTicketActivity(payload: EmailPayload): Promise<void>
   if (recipients.length === 0) return;
 
   try {
-    sgMail.setApiKey(SENDGRID_API_KEY);
+    const transporter = getTransporter();
     const html = buildHtml(payload);
-
-    await sgMail.send({
-      from: EMAIL_FROM,
-      to: recipients,
+    await transporter.sendMail({
+      from: `"Solicitudes IM" <${GMAIL_SENDER}>`,
+      to: recipients.join(","),
       subject: payload.subject,
       html,
     });
-
     console.log(`[email] Sent: "${payload.subject}" to ${recipients.length} recipients`);
   } catch (err) {
     console.error("[email] Failed to send:", err instanceof Error ? err.message : err);

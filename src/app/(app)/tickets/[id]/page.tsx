@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft, Send, Loader2, Clock, CheckCircle2,
-  AlertCircle, MessageSquare, FileText, PenLine, Link as LinkIcon, Target, CalendarDays, Copy, Users,
+  AlertCircle, MessageSquare, FileText, PenLine, Link as LinkIcon, Target, CalendarDays, Copy, Users, Bot, User,
 } from "lucide-react";
 import { TICKET_STATUSES, TICKET_PRIORITIES, TICKET_CATEGORIES } from "@/lib/constants";
 

@@ -20,7 +20,7 @@ export async function GET(
 
   if (!file) return new NextResponse("Archivo no encontrado", { status: 404 });
 
-  return new NextResponse(file.data, {
+  return new NextResponse(new Uint8Array(file.data), {
     headers: {
       "Content-Type":        file.contentType,
       "Content-Disposition": `inline; filename="${encodeURIComponent(file.name)}"`,

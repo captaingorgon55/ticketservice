@@ -166,17 +166,13 @@ function StatCard({
 
 // ── Create Ticket Modal ──────────────────────────────
 
-async function uploadToCloudinary(file: File): Promise<{ name: string; url: string; type: string }> {
-  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-  const preset    = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-  if (!cloudName || !preset) throw new Error("Cloudinary no configurado");
+async function uploadFile(file: File): Promise<{ name: string; url: string; type: string }> {
   const fd = new FormData();
   fd.append("file", file);
-  fd.append("upload_preset", preset);
-  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, { method: "POST", body: fd });
-  if (!res.ok) throw new Error("Error al subir archivo");
-  const data = await res.json() as { secure_url: string };
-  return { name: file.name, url: data.secure_url, type: file.type };
+  const res = await fetch("/api/upload", { method: "POST", body: fd });
+  const data = await res.json() as { url?: string; error?: string };
+  if (!res.ok || !data.url) throw new Error(data.error ?? "Error al subir archivo");
+  return { name: file.name, url: data.url, type: file.type };
 }
 
 function CreateTicketModal({ onClose }: { onClose: () => void }) {
@@ -226,7 +222,7 @@ function CreateTicketModal({ onClose }: { onClose: () => void }) {
     if (files.length > 0) {
       setUploading(true);
       try {
-        attachments = await Promise.all(files.map(uploadToCloudinary));
+        attachments = await Promise.all(files.map(uploadFile));
       } catch {
         setError("Error al subir archivos. Verifica la configuración de Cloudinary.");
         setUploading(false);

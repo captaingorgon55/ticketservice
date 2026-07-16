@@ -41,8 +41,8 @@ export async function GET(
     : (EXT_TYPES[ext] ?? "application/octet-stream");
 
   // Convertir Buffer de Mongoose a ArrayBuffer correctamente
-  const buf    = file.data as Buffer;
-  const arrayBuf = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+  const buf      = file.data as Buffer;
+  const arrayBuf = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
 
   return new NextResponse(arrayBuf, {
     headers: {

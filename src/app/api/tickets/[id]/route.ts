@@ -209,3 +209,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   return NextResponse.json({ ticket: populated });
 }
+
+/** DELETE /api/tickets/[id] — soft delete (solo admin) */
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await requireAuth();
+  if (session instanceof NextResponse) return session;
+  const role = (session.user as { role?: string })?.role;
+  if (role !== "admin") return NextResponse.json({ error: "Solo admins pueden eliminar tickets" }, { status: 403 });
+
+  const { id } = await params;
+  await dbConnect();
+  const ticket = await Ticket.findByIdAndUpdate(id, { isActive: false }, { new: true });
+  if (!ticket) return NextResponse.json({ error: "Ticket no encontrado" }, { status: 404 });
+
+  return NextResponse.json({ ok: true });
+}

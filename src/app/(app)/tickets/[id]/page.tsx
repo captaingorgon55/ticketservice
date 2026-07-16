@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   ArrowLeft, Send, Loader2, Clock, CheckCircle2,
   AlertCircle, MessageSquare, FileText, PenLine, Link as LinkIcon, Target, CalendarDays, Copy, Users, Bot, User,
@@ -153,6 +154,15 @@ export default function TicketDetailPage() {
   const [newFiles, setNewFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const { data: sessionData } = useSession();
+  const isAdmin = (sessionData?.user as { role?: string })?.role === "admin";
+
+  const deleteMut = useMutation({
+    mutationFn: () => apiFetch(`/api/tickets/${id}`, { method: "DELETE" }),
+    onSuccess: () => router.push("/"),
+  });
 
   function copyTicketNumber(num: number) {
     navigator.clipboard.writeText(String(num));
@@ -237,13 +247,41 @@ export default function TicketDetailPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Back */}
-      <button
-        onClick={() => router.push("/")}
-        className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition"
-      >
-        <ArrowLeft size={16} />
-        Volver al dashboard
-      </button>
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => router.push("/")}
+          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition"
+        >
+          <ArrowLeft size={16} />
+          Volver al dashboard
+        </button>
+        {isAdmin && !confirmDelete && (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition"
+          >
+            🗑 Eliminar ticket
+          </button>
+        )}
+        {isAdmin && confirmDelete && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">¿Confirmar eliminación?</span>
+            <button
+              onClick={() => deleteMut.mutate()}
+              disabled={deleteMut.isPending}
+              className="px-3 py-1.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition disabled:opacity-50"
+            >
+              {deleteMut.isPending ? "Eliminando…" : "Sí, eliminar"}
+            </button>
+            <button
+              onClick={() => setConfirmDelete(false)}
+              className="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+            >
+              Cancelar
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Header card */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 fade-in">

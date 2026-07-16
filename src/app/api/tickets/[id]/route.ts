@@ -172,11 +172,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   // ── Notificar a nuevos participantes (siempre, independiente de otros cambios) ──
+  console.log(`[participants] nuevos IDs: ${newlyAddedParticipantIds.length}`);
   if (newlyAddedParticipantIds.length > 0) {
     const updaterName = session.user?.name ?? "—";
     const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
     const newUsers = await User.find({ _id: { $in: newlyAddedParticipantIds } }).select("email").lean();
     const newEmails = newUsers.map((u) => u.email).filter(Boolean) as string[];
+    console.log(`[participants] emails a notificar: ${newEmails.join(", ")}`);
     if (newEmails.length > 0) {
       notifyTicketActivity({
         subject: `👥 Te agregaron al ticket #${ticket.ticketNumber}: ${ticket.title}`,

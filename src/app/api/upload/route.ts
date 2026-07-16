@@ -3,55 +3,52 @@ import { auth } from "@/lib/auth";
 
 export const maxDuration = 60;
 
-const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME ?? "";
-const API_KEY    = process.env.CLOUDINARY_API_KEY    ?? "";
-const API_SECRET = process.env.CLOUDINARY_API_SECRET ?? "";
+const DATABRICKS_HOST  = (process.env.DATABRICKS_HOST  ?? "").replace(/\/$/, "");
+const DATABRICKS_TOKEN = process.env.DATABRICKS_TOKEN  ?? "";
+const DBFS_BASE        = "solicitudes-im";
 
-/** POST /api/upload — sube un archivo a Cloudinary */
+/** POST /api/upload — sube un archivo a Databricks DBFS */
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
-  if (!CLOUD_NAME || !API_KEY || !API_SECRET) {
-    return NextResponse.json({ error: "Cloudinary no configurado (faltan CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY o CLOUDINARY_API_SECRET)" }, { status: 500 });
+  if (!DATABRICKS_HOST || !DATABRICKS_TOKEN) {
+    return NextResponse.json({ error: "Databricks no configurado (faltan DATABRICKS_HOST o DATABRICKS_TOKEN)" }, { status: 500 });
   }
 
-  const formData = await req.formData();
+  const formData     = await req.formData();
   const file         = formData.get("file")         as File   | null;
   const ticketNumber = formData.get("ticketNumber") as string | null;
 
   if (!file) return NextResponse.json({ error: "No se recibió archivo" }, { status: 400 });
 
-  const timestamp = Math.floor(Date.now() / 1000).toString();
-  const folder    = ticketNumber ? `solicitudes-im/ticket-${ticketNumber}` : "solicitudes-im";
+  const folder   = ticketNumber ? `${DBFS_BASE}/ticket-${ticketNumber}` : DBFS_BASE;
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const dbfsPath = `/${folder}/${Date.now()}-${safeName}`;
 
-  // Firma SHA-1
-  const str     = `folder=${folder}&timestamp=${timestamp}${API_SECRET}`;
-  const msgBuf  = new TextEncoder().encode(str);
-  const hashBuf = await crypto.subtle.digest("SHA-1", msgBuf);
-  const signature = Array.from(new Uint8Array(hashBuf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  const buffer = await file.arrayBuffer();
 
-  const cd = new FormData();
-  cd.append("file",      file);
-  cd.append("api_key",   API_KEY);
-  cd.append("timestamp", timestamp);
-  cd.append("signature", signature);
-  cd.append("folder",    folder);
-
+  // Databricks Files API — PUT /api/2.0/fs/files/{path}
   const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`,
-    { method: "POST", body: cd }
+    `${DATABRICKS_HOST}/api/2.0/fs/files${dbfsPath}`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${DATABRICKS_TOKEN}`,
+        "Content-Type": "application/octet-stream",
+      },
+      body: buffer,
+    }
   );
 
-  const data = await res.json() as { secure_url?: string; error?: { message: string } };
-
-  if (!res.ok || !data.secure_url) {
-    console.error("[upload] Cloudinary error:", data.error?.message);
-    return NextResponse.json({ error: data.error?.message ?? "Error al subir" }, { status: 500 });
+  if (!res.ok) {
+    const err = await res.text();
+    console.error("[upload] Databricks error:", err.slice(0, 200));
+    return NextResponse.json({ error: `Error al subir a Databricks: ${err.slice(0, 150)}` }, { status: 500 });
   }
 
-  console.log(`[upload] ${file.name} → ${folder}`);
-  return NextResponse.json({ url: data.secure_url, name: file.name, type: file.type });
+  // La URL es interna — se sirve a través de nuestro proxy /api/files
+  const url = `/api/files${dbfsPath}?name=${encodeURIComponent(file.name)}`;
+  console.log(`[upload] ${file.name} → dbfs:${dbfsPath}`);
+  return NextResponse.json({ url, name: file.name, type: file.type });
 }

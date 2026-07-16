@@ -249,8 +249,8 @@ function CreateTicketModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 sm:p-4">
+      <div className="bg-white sm:rounded-xl shadow-xl w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto rounded-t-2xl">
         <div className="p-6 border-b border-gray-100">
           <h2 className="text-lg font-bold text-gray-900">Nuevo ticket</h2>
           <p className="text-sm text-gray-400 mt-0.5">Crea una solicitud interna o de publicación</p>
@@ -514,7 +514,7 @@ function AdminDashboard({ onCreateClick }: { onCreateClick: () => void }) {
     <div className="space-y-4">
       <WelcomeBanner stats={stats} />
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-lg font-bold text-gray-900">Dashboard</h1>
         </div>
@@ -528,7 +528,7 @@ function AdminDashboard({ onCreateClick }: { onCreateClick: () => void }) {
 
       {/* Stat cards */}
       {stats && (
-        <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <StatCard label="Total"        value={stats.total}                    icon={<Ticket size={16} />}       color="#6b7280" />
           <StatCard label="Abiertos"     value={stats.byStatus.abierto}         icon={<AlertCircle size={16} />}  color="#3b82f6" />
           <StatCard label="En Progreso"  value={stats.byStatus.en_progreso}     icon={<Clock size={16} />}        color="#f59e0b" />
@@ -539,7 +539,7 @@ function AdminDashboard({ onCreateClick }: { onCreateClick: () => void }) {
       )}
 
       {/* Charts row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4">
 
         {/* Workload por analista */}
         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-5">
@@ -773,14 +773,14 @@ function WelcomeBanner({ stats }: { stats?: Stats }) {
   const rate      = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   return (
-    <div className="bg-gradient-to-r from-red-600 to-red-700 rounded-xl p-5 text-white">
+    <div className="bg-gradient-to-r from-red-600 to-red-700 rounded-xl p-4 sm:p-5 text-white">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-red-200">{greeting},</p>
           <h2 className="text-xl font-bold">{name} 👋</h2>
         </div>
         {stats && (
-          <div className="flex gap-6 text-center">
+          <div className="flex gap-4 sm:gap-6 text-center">
             <div>
               <p className="text-2xl font-bold">{pending}</p>
               <p className="text-xs text-red-200">Pendientes</p>

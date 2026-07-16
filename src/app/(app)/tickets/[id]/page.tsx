@@ -392,7 +392,7 @@ export default function TicketDetailPage() {
                     {ticket.attachments.map((a, i) => (
                       <a
                         key={i}
-                        href={`/api/download?u=${encodeURIComponent(a.url)}&n=${encodeURIComponent(a.name)}`}
+                        href={a.url.startsWith("/api/files/") ? a.url : `/api/download?u=${encodeURIComponent(a.url)}&n=${encodeURIComponent(a.name)}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 hover:bg-red-50 hover:border-red-200 hover:text-red-700 transition"
@@ -508,7 +508,7 @@ export default function TicketDetailPage() {
               {ticket.attachments.map((a, i) => (
                 <a
                   key={i}
-                  href={`/api/download?u=${encodeURIComponent(a.url)}&n=${encodeURIComponent(a.name)}`}
+                  href={a.url.startsWith("/api/files/") ? a.url : `/api/download?u=${encodeURIComponent(a.url)}&n=${encodeURIComponent(a.name)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 hover:bg-red-50 hover:border-red-200 hover:text-red-700 transition"
@@ -582,7 +582,7 @@ export default function TicketDetailPage() {
                       <>
                         {comment.content && <p className="text-sm text-gray-700 whitespace-pre-wrap">{comment.content}</p>}
                         {(comment.metadata?.attachments as { name: string; url: string }[] | undefined)?.map((a, i) => (
-                          <a key={i} href={`/api/download?u=${encodeURIComponent(a.url)}&n=${encodeURIComponent(a.name)}`} target="_blank" rel="noopener noreferrer"
+                          <a key={i} href={a.url.startsWith("/api/files/") ? a.url : `/api/download?u=${encodeURIComponent(a.url)}&n=${encodeURIComponent(a.name)}`} target="_blank" rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 text-xs text-red-600 hover:underline mt-1 mr-2">
                             📎 {a.name}
                           </a>

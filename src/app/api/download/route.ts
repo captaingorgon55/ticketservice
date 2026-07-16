@@ -13,9 +13,10 @@ export async function GET(req: NextRequest) {
 
   if (!rawUrl) return new NextResponse("URL requerida", { status: 400 });
 
-  // Si ya es una URL interna /api/files/..., redirigir directamente
+  // Si ya es una URL interna /api/files/..., redirigir usando APP_URL
   if (rawUrl.startsWith("/api/files/")) {
-    return NextResponse.redirect(new URL(rawUrl, req.url));
+    const base = process.env.APP_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+    return NextResponse.redirect(new URL(rawUrl, base));
   }
 
   // Para URLs externas de Cloudinary (adjuntos antiguos), intentar fetch directo

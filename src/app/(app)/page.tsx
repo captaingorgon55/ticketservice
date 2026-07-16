@@ -77,7 +77,9 @@ async function apiFetch(url: string, init?: RequestInit) {
     const body = await res.json().catch(() => ({}));
     throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
   }
-  return res.json();
+  const text = await res.text();
+  if (!text) return {};
+  try { return JSON.parse(text); } catch { return {}; }
 }
 
 // ── Shared badge components ──────────────────────────

@@ -32,7 +32,9 @@ function Bar({ value, max, color }: { value: number; max: number; color: string 
 async function apiFetch(url: string) {
   const res = await fetch(url);
   if (!res.ok) throw new Error("Error");
-  return res.json();
+  const text = await res.text();
+  if (!text) return {};
+  try { return JSON.parse(text); } catch { return {}; }
 }
 
 export default function ReportesPage() {

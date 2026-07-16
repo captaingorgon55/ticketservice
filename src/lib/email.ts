@@ -99,7 +99,7 @@ export async function notifyTicketActivity(payload: EmailPayload): Promise<void>
       }),
     });
 
-    const data = await res.json() as { messageId?: string; message?: string; code?: string };
+    const data = await res.json().catch(() => ({})) as { messageId?: string; message?: string; code?: string };
 
     if (!res.ok) {
       console.error("[email] Brevo error:", JSON.stringify(data));

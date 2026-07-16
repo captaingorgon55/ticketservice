@@ -16,7 +16,7 @@ export async function GET() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const baseFilter: Record<string, any> = { isActive: true };
   if (role !== "admin") {
-    baseFilter.$or = [{ assignedTo: userId }, { createdBy: userId }];
+    baseFilter.$or = [{ assignedTo: userId }, { participants: userId }, { createdBy: userId }];
   }
 
   const allActive = await Ticket.find(baseFilter).lean();

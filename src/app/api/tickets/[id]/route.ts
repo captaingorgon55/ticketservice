@@ -22,6 +22,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const ticket = await Ticket.findById(id)
     .populate("createdBy", "name email role")
     .populate("assignedTo", "name email role")
+    .populate("participants", "name email role")
     .lean();
 
   if (!ticket) {
@@ -107,7 +108,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (mustInclude !== undefined && typeof mustInclude === "string") ticket.mustInclude = mustInclude.trim() || null;
   if (supportingMaterials !== undefined && typeof supportingMaterials === "string") ticket.supportingMaterials = supportingMaterials.trim() || null;
 
-  const { addAttachments } = body as { addAttachments?: { name: string; url: string; type: string }[] };
+  const { addAttachments, participants: newParticipants } = body as {
+    addAttachments?: { name: string; url: string; type: string }[];
+    participants?: string[];
+  };
+
+  if (Array.isArray(newParticipants)) {
+    ticket.participants = newParticipants as unknown as typeof ticket.participants;
+  }
   if (Array.isArray(addAttachments) && addAttachments.length > 0) {
     ticket.attachments = [...(ticket.attachments ?? []), ...addAttachments];
     changes.push(`Archivos adjuntos: +${addAttachments.length} archivo(s)`);

@@ -112,31 +112,36 @@ export async function GET(req: NextRequest) {
   const role   = (session.user as { id?: string; role?: string })?.role;
 
   const { searchParams } = new URL(req.url);
-  const status   = searchParams.get("status");
-  const category = searchParams.get("category");
-  const priority = searchParams.get("priority");
-  const assigned = searchParams.get("assignedTo");
-  const created  = searchParams.get("createdBy");
-  const q        = searchParams.get("q");
-  const page     = Math.max(1, parseInt(searchParams.get("page") ?? "1"));
-  const limit    = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") ?? "20")));
+  const status       = searchParams.get("status");
+  const category     = searchParams.get("category");
+  const priority     = searchParams.get("priority");
+  const assigned     = searchParams.get("assignedTo");
+  const created      = searchParams.get("createdBy");
+  const q            = searchParams.get("q");
+  const ticketNumber = searchParams.get("ticketNumber");
+  const page         = Math.max(1, parseInt(searchParams.get("page") ?? "1"));
+  const limit        = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") ?? "20")));
 
   await dbConnect();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const filter: Record<string, any> = { isActive: true };
 
-  // Analistas ven tickets que les asignaron O que ellos crearon
+  // Analistas ven tickets donde son asignado, participante o creador
   if (role !== "admin") {
-    filter.$or = [{ assignedTo: userId }, { createdBy: userId }];
+    filter.$or = [{ assignedTo: userId }, { participants: userId }, { createdBy: userId }];
   } else {
     if (assigned) filter.assignedTo = assigned === "unassigned" ? null : assigned;
   }
 
-  if (status)   filter.status   = { $in: status.split(",") };
-  if (category) filter.category = { $in: category.split(",") };
-  if (priority) filter.priority = { $in: priority.split(",") };
-  if (created)  filter.createdBy  = created;
+  if (ticketNumber) {
+    filter.ticketNumber = parseInt(ticketNumber);
+  } else {
+    if (status)   filter.status   = { $in: status.split(",") };
+    if (category) filter.category = { $in: category.split(",") };
+    if (priority) filter.priority = { $in: priority.split(",") };
+    if (created)  filter.createdBy  = created;
+  }
   if (q) {
     filter.$or = [
       { title:       { $regex: q, $options: "i" } },

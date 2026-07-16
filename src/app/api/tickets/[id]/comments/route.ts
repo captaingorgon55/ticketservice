@@ -34,23 +34,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { id } = await params;
   const body = await req.json();
-  const { content } = body as { content?: string };
+  const { content, attachments } = body as {
+    content?: string;
+    attachments?: { name: string; url: string; type: string }[];
+  };
 
-  if (!content?.trim()) {
+  if (!content?.trim() && (!attachments || attachments.length === 0)) {
     return NextResponse.json({ error: "El comentario no puede estar vacío" }, { status: 400 });
   }
 
   await dbConnect();
   const ticket = await Ticket.findById(id)
     .populate("assignedTo", "email")
-    .populate("createdBy", "email");
+    .populate("createdBy", "email")
+    .populate("participants", "email");
   if (!ticket) return NextResponse.json({ error: "Ticket no encontrado" }, { status: 404 });
 
   const comment = await TicketComment.create({
     ticket: id,
     author: userId,
-    content: content.trim(),
+    content: content?.trim() ?? "",
     type: "comment",
+    metadata: attachments?.length ? { attachments } : {},
   });
 
   const populated = await TicketComment.findById(comment._id)
@@ -62,10 +67,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 
   const ticketAny = ticket as unknown as Record<string, unknown>;
-  const assignedUser = ticketAny.assignedTo as Record<string, unknown> | null;
-  const createdByUser = ticketAny.createdBy as Record<string, unknown> | null;
-  const extraRecipients = [assignedUser?.email, createdByUser?.email]
-    .filter((e): e is string => typeof e === "string" && e.length > 0);
+  const assignedUser  = ticketAny.assignedTo as Record<string, unknown> | null;
+  const createdByUser = ticketAny.createdBy  as Record<string, unknown> | null;
+  const participantUsers = (ticketAny.participants as Record<string, unknown>[] | null) ?? [];
+  const extraRecipients = [
+    assignedUser?.email,
+    createdByUser?.email,
+    ...participantUsers.map((p) => p.email),
+  ].filter((e): e is string => typeof e === "string" && e.length > 0);
 
   notifyTicketActivity({
     subject: `💬 Nuevo comentario en #${ticket.ticketNumber}: ${ticket.title}`,

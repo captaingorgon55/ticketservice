@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import {
@@ -465,9 +466,18 @@ function TicketList({
 // ── Admin Dashboard ──────────────────────────────────
 
 function AdminDashboard({ onCreateClick }: { onCreateClick: () => void }) {
-  const [search, setSearch]           = useState("");
+  const searchParams = useSearchParams();
+  const [search, setSearch]           = useState(searchParams.get("q") ?? "");
+  const [ticketNumber, setTicketNumber] = useState(searchParams.get("ticketNumber") ?? "");
   const [filterStatus, setFilterStatus] = useState("abierto,en_progreso,en_revision");
   const [filterPriority, setFilterPriority] = useState("");
+
+  useEffect(() => {
+    const q = searchParams.get("q");
+    const tn = searchParams.get("ticketNumber");
+    if (q) setSearch(q);
+    if (tn) setTicketNumber(tn);
+  }, [searchParams]);
 
   const { data: stats } = useQuery<Stats>({
     queryKey: ["ticket-stats"],
@@ -482,11 +492,12 @@ function AdminDashboard({ onCreateClick }: { onCreateClick: () => void }) {
   });
 
   const { data: ticketsData, isLoading } = useQuery<{ tickets: TicketRow[] }>({
-    queryKey: ["tickets", search, filterStatus, filterPriority],
+    queryKey: ["tickets", search, ticketNumber, filterStatus, filterPriority],
     queryFn: () => {
       const p = new URLSearchParams();
-      if (search) p.set("q", search);
-      if (filterStatus) p.set("status", filterStatus);
+      if (ticketNumber) p.set("ticketNumber", ticketNumber);
+      else if (search) p.set("q", search);
+      if (!ticketNumber && filterStatus) p.set("status", filterStatus);
       if (filterPriority) p.set("priority", filterPriority);
       return apiFetch(`/api/tickets?${p.toString()}`);
     },
@@ -500,12 +511,12 @@ function AdminDashboard({ onCreateClick }: { onCreateClick: () => void }) {
   const priMax = stats ? Math.max(...Object.values(stats.byPriority), 1) : 1;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      <WelcomeBanner stats={stats} />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Dashboard Admin</h1>
-          <p className="text-sm text-gray-400 mt-0.5">Vista completa de todos los tickets</p>
+          <h1 className="text-lg font-bold text-gray-900">Dashboard</h1>
         </div>
         <button
           onClick={onCreateClick}
@@ -662,7 +673,8 @@ function AdminDashboard({ onCreateClick }: { onCreateClick: () => void }) {
 // ── Analista Dashboard ───────────────────────────────
 
 function AnalistaDashboard({ onCreateClick }: { onCreateClick: () => void }) {
-  const [search, setSearch]             = useState("");
+  const searchParams = useSearchParams();
+  const [search, setSearch]             = useState(searchParams.get("q") ?? "");
   const [filterStatus, setFilterStatus] = useState("abierto,en_progreso,en_revision");
 
   const { data: stats } = useQuery<Stats>({
@@ -684,17 +696,15 @@ function AnalistaDashboard({ onCreateClick }: { onCreateClick: () => void }) {
   const tickets = ticketsData?.tickets ?? [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      <WelcomeBanner stats={stats} />
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Mis Tickets</h1>
-          <p className="text-sm text-gray-400 mt-0.5">Tickets asignados a ti o creados por ti</p>
-        </div>
+        <h1 className="text-lg font-bold text-gray-900">Mis Solicitudes</h1>
         <button
           onClick={onCreateClick}
           className="flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition shadow-sm"
         >
-          <Plus size={16} /> Nuevo
+          <Plus size={16} /> Nueva
         </button>
       </div>
 
@@ -744,6 +754,47 @@ function AnalistaDashboard({ onCreateClick }: { onCreateClick: () => void }) {
           <p className="text-sm font-semibold text-gray-700">Tickets ({tickets.length})</p>
         </div>
         <TicketList tickets={tickets} isLoading={isLoading} onCreateClick={onCreateClick} />
+      </div>
+    </div>
+  );
+}
+
+// ── Welcome Banner ───────────────────────────────────
+
+function WelcomeBanner({ stats }: { stats?: Stats }) {
+  const { data: session } = useSession();
+  const name = session?.user?.name?.split(" ")[0] ?? "bienvenido";
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Buenos días" : hour < 18 ? "Buenas tardes" : "Buenas noches";
+
+  const pending   = (stats?.byStatus.abierto ?? 0) + (stats?.byStatus.en_progreso ?? 0) + (stats?.byStatus.en_revision ?? 0);
+  const completed = (stats?.byStatus.resuelto ?? 0) + (stats?.byStatus.cerrado ?? 0);
+  const total     = stats?.total ?? 0;
+  const rate      = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+  return (
+    <div className="bg-gradient-to-r from-red-600 to-red-700 rounded-xl p-5 text-white">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-red-200">{greeting},</p>
+          <h2 className="text-xl font-bold">{name} 👋</h2>
+        </div>
+        {stats && (
+          <div className="flex gap-6 text-center">
+            <div>
+              <p className="text-2xl font-bold">{pending}</p>
+              <p className="text-xs text-red-200">Pendientes</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{completed}</p>
+              <p className="text-xs text-red-200">Completadas</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{rate}%</p>
+              <p className="text-xs text-red-200">Completado</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

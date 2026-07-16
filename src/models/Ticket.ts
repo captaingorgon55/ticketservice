@@ -18,7 +18,8 @@ export interface ITicket {
   status: TicketStatus;
   source: TicketSource;
   createdBy: mongoose.Types.ObjectId;
-  assignedTo: mongoose.Types.ObjectId | null;
+  assignedTo:   mongoose.Types.ObjectId | null;
+  participants: mongoose.Types.ObjectId[];
   tags: string[];
   dueDate: Date | null;
   aiSuggestion: string | null;
@@ -65,7 +66,8 @@ const TicketSchema = new Schema<ITicket>(
       default: "interna",
     },
     createdBy:   { type: Schema.Types.ObjectId, ref: "User", required: true },
-    assignedTo:  { type: Schema.Types.ObjectId, ref: "User", default: null },
+    assignedTo:   { type: Schema.Types.ObjectId, ref: "User", default: null },
+  participants: { type: [Schema.Types.ObjectId], ref: "User", default: [] },
     tags:        { type: [String], default: [] },
     dueDate:     { type: Date, default: null },
     aiSuggestion:    { type: String, default: null },

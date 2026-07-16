@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import {
-  ArrowLeft, Send, Bot, Loader2, User, Clock, CheckCircle2,
-  AlertCircle, MessageSquare, Sparkles, FileText, PenLine, Link as LinkIcon, Target, CalendarDays,
+  ArrowLeft, Send, Loader2, Clock, CheckCircle2,
+  AlertCircle, MessageSquare, FileText, PenLine, Link as LinkIcon, Target, CalendarDays, Copy, Users,
 } from "lucide-react";
 import { TICKET_STATUSES, TICKET_PRIORITIES, TICKET_CATEGORIES } from "@/lib/constants";
 
@@ -48,6 +48,7 @@ interface TicketDetail {
   mustInclude?: string | null;
   supportingMaterials?: string | null;
   attachments?: { name: string; url: string; type: string }[];
+  participants?: UserRef[];
 }
 
 // ── Helpers ─────────────────────────────────────────
@@ -74,6 +75,65 @@ function getCommentIcon(type: string) {
   }
 }
 
+function CommentInput({
+  onSubmit, isPending,
+}: {
+  onSubmit: (content: string, files: File[]) => Promise<void>;
+  isPending: boolean;
+}) {
+  const [text, setText] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!text.trim() && files.length === 0) return;
+    setUploading(true);
+    try {
+      await onSubmit(text.trim(), files);
+      setText("");
+      setFiles([]);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-2">
+      <div className="flex gap-2">
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Escribe una observación..."
+          className="flex-1 px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+        />
+        <button
+          type="submit"
+          disabled={(!text.trim() && files.length === 0) || isPending || uploading}
+          className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition disabled:opacity-50 flex items-center gap-2"
+        >
+          {(isPending || uploading) ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+          Enviar
+        </button>
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          type="file"
+          multiple
+          onChange={(e) => setFiles(f => [...f, ...Array.from(e.target.files ?? [])])}
+          className="text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-100 file:text-gray-600 hover:file:bg-gray-200"
+        />
+        {files.map((f, i) => (
+          <span key={i} className="text-xs bg-gray-100 px-2 py-0.5 rounded flex items-center gap-1">
+            {f.name}
+            <button type="button" onClick={() => setFiles(files.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500">✕</button>
+          </span>
+        ))}
+      </div>
+    </form>
+  );
+}
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("es-CO", {
     day: "numeric", month: "short", year: "numeric",
@@ -90,6 +150,13 @@ export default function TicketDetailPage() {
   const [newComment, setNewComment] = useState("");
   const [newFiles, setNewFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  function copyTicketNumber(num: number) {
+    navigator.clipboard.writeText(String(num));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   const { data, isLoading } = useQuery<{ ticket: TicketDetail; comments: Comment[] }>({
     queryKey: ["ticket", id],
@@ -103,12 +170,9 @@ export default function TicketDetailPage() {
   });
 
   const commentMut = useMutation({
-    mutationFn: (content: string) =>
-      apiFetch(`/api/tickets/${id}/comments`, { method: "POST", body: JSON.stringify({ content }) }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["ticket", id] });
-      setNewComment("");
-    },
+    mutationFn: (body: { content: string; attachments?: { name: string; url: string; type: string }[] }) =>
+      apiFetch(`/api/tickets/${id}/comments`, { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ticket", id] }),
   });
 
   const updateMut = useMutation({
@@ -182,9 +246,14 @@ export default function TicketDetailPage() {
         <div className="flex items-start justify-between mb-4">
           <div>
             <div className="flex items-center gap-2.5 mb-2">
-              <span className="text-xs font-mono text-gray-400 bg-gray-100 px-2 py-1 rounded">
+              <button
+                onClick={() => copyTicketNumber(ticket.ticketNumber)}
+                className="flex items-center gap-1 text-xs font-mono text-gray-400 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition"
+                title="Copiar número"
+              >
                 #{ticket.ticketNumber}
-              </span>
+                {copied ? <CheckCircle2 size={11} className="text-green-500" /> : <Copy size={11} />}
+              </button>
               <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
                 {catInfo?.icon} {catInfo?.label}
               </span>
@@ -341,6 +410,49 @@ export default function TicketDetailPage() {
         </div>
       </div>
 
+      {/* Participantes */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 fade-in">
+        <div className="flex items-center gap-2 mb-3">
+          <Users size={15} className="text-gray-400" />
+          <span className="text-sm font-semibold text-gray-700">Participantes</span>
+        </div>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {(ticket.participants ?? []).length === 0 ? (
+            <span className="text-xs text-gray-400">Sin participantes adicionales</span>
+          ) : (
+            (ticket.participants ?? []).map((p) => (
+              <span key={p._id} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-full text-xs text-blue-700">
+                {p.name}
+                <button
+                  onClick={() => {
+                    const ids = (ticket.participants ?? []).filter((x) => x._id !== p._id).map((x) => x._id);
+                    updateMut.mutate({ participants: ids });
+                  }}
+                  className="text-blue-400 hover:text-blue-700"
+                >✕</button>
+              </span>
+            ))
+          )}
+        </div>
+        <select
+          onChange={(e) => {
+            if (!e.target.value) return;
+            const current = (ticket.participants ?? []).map((p) => p._id);
+            if (!current.includes(e.target.value)) {
+              updateMut.mutate({ participants: [...current, e.target.value] });
+            }
+            e.target.value = "";
+          }}
+          className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+          defaultValue=""
+        >
+          <option value="">+ Agregar participante</option>
+          {users.filter((u) => !(ticket.participants ?? []).find((p) => p._id === u._id) && u._id !== ticket.assignedTo?._id).map((u) => (
+            <option key={u._id} value={u._id}>{u.name}</option>
+          ))}
+        </select>
+      </div>
+
       {/* Adjuntos */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden fade-in">
         <div className="px-5 py-3.5 border-b border-gray-100">
@@ -416,7 +528,13 @@ export default function TicketDetailPage() {
                     </span>
                     <span className="text-xs text-gray-400">{formatDate(comment.createdAt)}</span>
                   </div>
-                  <p className="text-sm text-gray-600 whitespace-pre-wrap">{comment.content}</p>
+                  {comment.content && <p className="text-sm text-gray-600 whitespace-pre-wrap">{comment.content}</p>}
+                  {(comment.metadata?.attachments as { name: string; url: string }[] | undefined)?.map((a, i) => (
+                    <a key={i} href={a.url} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-red-600 hover:underline mt-1">
+                      📎 {a.name}
+                    </a>
+                  ))}
                 </div>
               </div>
             ))
@@ -425,29 +543,24 @@ export default function TicketDetailPage() {
       </div>
 
       {/* Comment input */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (newComment.trim()) commentMut.mutate(newComment);
+      <div className="bg-white rounded-xl border border-gray-200 p-4 fade-in">
+        <CommentInput
+          onSubmit={async (content, files) => {
+            let attachments: { name: string; url: string; type: string }[] = [];
+            if (files.length > 0) {
+              attachments = await Promise.all(files.map(async (f) => {
+                const fd = new FormData();
+                fd.append("file", f);
+                const res = await fetch("/api/upload", { method: "POST", body: fd });
+                const data = await res.json() as { url?: string; error?: string };
+                if (!data.url) throw new Error(data.error ?? "Error al subir");
+                return { name: f.name, url: data.url, type: f.type };
+              }));
+            }
+            await commentMut.mutateAsync({ content, attachments });
           }}
-          className="flex gap-3"
-        >
-          <input
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Añade un comentario..."
-            className="flex-1 px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
-          />
-          <button
-            type="submit"
-            disabled={!newComment.trim() || commentMut.isPending}
-            className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition disabled:opacity-50 flex items-center gap-2"
-          >
-            {commentMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-            Enviar
-          </button>
-        </form>
+          isPending={commentMut.isPending}
+        />
       </div>
     </div>
   );

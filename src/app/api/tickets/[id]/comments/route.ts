@@ -87,7 +87,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       <p style="font-size:13px;color:#666;margin:0 0 4px;">
         <strong style="color:#333;">${esc(authorName?.name as string ?? "—")}</strong> comentó:
       </p>
-      <div style="padding:12px;background:#f9fafb;border-radius:8px;font-size:13px;color:#333;line-height:1.5;">${esc(content)}</div>
+      <div style="padding:12px;background:#f9fafb;border-radius:8px;font-size:13px;color:#333;line-height:1.5;">${esc(content ?? "")}</div>
     `,
   });
 

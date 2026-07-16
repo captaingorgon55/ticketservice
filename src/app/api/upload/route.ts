@@ -41,8 +41,13 @@ export async function POST(req: NextRequest) {
   cd.append("folder",      folder);
   cd.append("access_mode", "public");
 
+  // Usar "raw" para documentos/PDFs (sirve el archivo original, no lo convierte a imagen)
+  // Usar "image" solo para imágenes
+  const isImage    = file.type.startsWith("image/");
+  const uploadType = isImage ? "image" : "raw";
+
   const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`,
+    `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${uploadType}/upload`,
     { method: "POST", body: cd }
   );
 
@@ -53,6 +58,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: data.error?.message ?? "Error al subir" }, { status: 500 });
   }
 
-  console.log(`[upload] ${file.name} → ${folder}`);
+  console.log(`[upload] ${file.name} → ${folder} (${uploadType})`);
   return NextResponse.json({ url: data.secure_url, name: file.name, fileType: file.type });
 }

@@ -169,26 +169,29 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       `,
     });
 
-    // ── Notificar a nuevos participantes ──
-    if (newlyAddedParticipantIds.length > 0) {
-      const newUsers = await User.find({ _id: { $in: newlyAddedParticipantIds } }).select("email name").lean();
-      const newEmails = newUsers.map((u) => u.email).filter(Boolean) as string[];
-      if (newEmails.length > 0) {
-        notifyTicketActivity({
-          subject: `👥 Te agregaron al ticket #${ticket.ticketNumber}: ${ticket.title}`,
-          ticketNumber: ticket.ticketNumber,
-          ticketTitle: ticket.title,
-          ticketUrl: `${APP_URL}/tickets/${id}`,
-          extraRecipients: newEmails,
-          onlyDirect: true,
-          bodyHtml: `
-            <p style="font-size:13px;color:#666;margin:0 0 8px;">
-              <strong style="color:#333;">${esc(updaterName)}</strong> te agregó como participante en este ticket.
-            </p>
-            <p style="font-size:13px;color:#333;margin:0;">Ahora recibirás notificaciones sobre la actividad de esta solicitud.</p>
-          `,
-        });
-      }
+  }
+
+  // ── Notificar a nuevos participantes (siempre, independiente de otros cambios) ──
+  if (newlyAddedParticipantIds.length > 0) {
+    const updaterName = session.user?.name ?? "—";
+    const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
+    const newUsers = await User.find({ _id: { $in: newlyAddedParticipantIds } }).select("email").lean();
+    const newEmails = newUsers.map((u) => u.email).filter(Boolean) as string[];
+    if (newEmails.length > 0) {
+      notifyTicketActivity({
+        subject: `👥 Te agregaron al ticket #${ticket.ticketNumber}: ${ticket.title}`,
+        ticketNumber: ticket.ticketNumber,
+        ticketTitle: ticket.title,
+        ticketUrl: `${APP_URL}/tickets/${id}`,
+        extraRecipients: newEmails,
+        onlyDirect: true,
+        bodyHtml: `
+          <p style="font-size:13px;color:#666;margin:0 0 8px;">
+            <strong style="color:#333;">${esc(updaterName)}</strong> te agregó como participante.
+          </p>
+          <p style="font-size:13px;color:#333;margin:0;">Recibirás notificaciones sobre la actividad de esta solicitud.</p>
+        `,
+      });
     }
   }
 

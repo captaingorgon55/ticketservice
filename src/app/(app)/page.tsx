@@ -224,8 +224,8 @@ function CreateTicketModal({ onClose }: { onClose: () => void }) {
       setUploading(true);
       try {
         attachments = await Promise.all(files.map(uploadFile));
-      } catch {
-        setError("Error al subir archivos. Verifica la configuración de Cloudinary.");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error al subir archivos");
         setUploading(false);
         return;
       }

@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 
+export const config = {
+  api: { bodyParser: false },
+};
+
+// Aumentar límite de tamaño para archivos
+export const maxDuration = 60;
+
 const CLOUD_NAME     = process.env.CLOUDINARY_CLOUD_NAME ?? "";
 const API_KEY        = process.env.CLOUDINARY_API_KEY ?? "";
 const API_SECRET     = process.env.CLOUDINARY_API_SECRET ?? "";

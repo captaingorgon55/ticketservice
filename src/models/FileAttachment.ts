@@ -2,7 +2,7 @@ import { Schema, model, models } from "mongoose";
 
 const FileAttachmentSchema = new Schema(
   {
-    ticketId:    { type: Schema.Types.ObjectId, ref: "Ticket", required: true },
+    ticketId:    { type: String, required: true },
     name:        { type: String, required: true },
     contentType: { type: String, required: true },
     size:        { type: Number },

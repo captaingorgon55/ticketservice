@@ -22,16 +22,22 @@ export async function POST(req: NextRequest) {
 
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  await dbConnect();
-  const attachment = await FileAttachment.create({
-    ticketId:    ticketNumber ? `ticket-${ticketNumber}` : "general",
-    name:        file.name,
-    contentType: file.type || "application/octet-stream",
-    size:        file.size,
-    data:        buffer,
-  });
+  try {
+    await dbConnect();
+    const attachment = await FileAttachment.create({
+      ticketId:    ticketNumber ? `ticket-${ticketNumber}` : "general",
+      name:        file.name,
+      contentType: file.type || "application/octet-stream",
+      size:        file.size,
+      data:        buffer,
+    });
 
-  const url = `/api/files/${attachment._id}`;
-  console.log(`[upload] ${file.name} (${Math.round(file.size / 1024)} KB) → MongoDB ${attachment._id}`);
-  return NextResponse.json({ url, name: file.name, fileType: file.type });
+    const url = `/api/files/${attachment._id}`;
+    console.log(`[upload] ${file.name} (${Math.round(file.size / 1024)} KB) → MongoDB ${attachment._id}`);
+    return NextResponse.json({ url, name: file.name, fileType: file.type });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[upload] Error:", msg);
+    return NextResponse.json({ error: `Error al guardar archivo: ${msg.slice(0, 150)}` }, { status: 500 });
+  }
 }

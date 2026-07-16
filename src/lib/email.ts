@@ -1,8 +1,8 @@
 // ── Config ──────────────────────────────────────────
 
-const INSIDER_API_KEY = process.env.INSIDER_API_KEY ?? "";
+const BREVO_API_KEY    = process.env.BREVO_API_KEY ?? "";
 const EMAIL_FROM_NAME  = "Solicitudes IM";
-const EMAIL_FROM_EMAIL = process.env.EMAIL_FROM ?? "noreply@elespectador.com";
+const EMAIL_FROM_EMAIL = process.env.EMAIL_FROM ?? "inteligenciademercadosee@gmail.com";
 
 const NOTIFY_EMAILS = (process.env.NOTIFY_EMAILS ?? "")
   .split(",").map((e) => e.trim()).filter(Boolean);
@@ -21,8 +21,10 @@ function buildHtml(opts: {
         <tr><td style="background:#dc2626;padding:20px 28px;">
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
-              <td><h1 style="margin:0;font-size:18px;font-weight:700;color:#fff;">Solicitudes IM</h1>
-              <p style="margin:4px 0 0;font-size:13px;color:rgba(255,255,255,0.8);">Inteligencia de Mercados</p></td>
+              <td>
+                <h1 style="margin:0;font-size:18px;font-weight:700;color:#fff;">Solicitudes IM</h1>
+                <p style="margin:4px 0 0;font-size:13px;color:rgba(255,255,255,0.8);">Inteligencia de Mercados</p>
+              </td>
               <td align="right" style="vertical-align:bottom;">
                 <span style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.9);background:rgba(0,0,0,0.15);padding:4px 10px;border-radius:6px;">#${opts.ticketNumber}</span>
               </td>
@@ -60,8 +62,8 @@ export type EmailPayload = {
 };
 
 export async function notifyTicketActivity(payload: EmailPayload): Promise<void> {
-  if (!INSIDER_API_KEY) {
-    console.log("[email] INSIDER_API_KEY no configurada — omitiendo envío");
+  if (!BREVO_API_KEY) {
+    console.log("[email] BREVO_API_KEY no configurada");
     return;
   }
 
@@ -76,28 +78,28 @@ export async function notifyTicketActivity(payload: EmailPayload): Promise<void>
   const html = buildHtml(payload);
 
   try {
-    const res = await fetch("https://mail.useinsider.com/mail/v1/send", {
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
       headers: {
-        "X-INS-AUTH-KEY": INSIDER_API_KEY,
+        "api-key": BREVO_API_KEY,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        sender: { name: EMAIL_FROM_NAME, email: EMAIL_FROM_EMAIL },
+        to: recipients.map((email) => ({ email, name: email.split("@")[0] })),
         subject: payload.subject,
-        from: { name: EMAIL_FROM_NAME, email: EMAIL_FROM_EMAIL },
-        tos: recipients.map((email) => ({ email, name: email.split("@")[0] })),
-        content: [{ type: "text/html", value: html }],
+        htmlContent: html,
       }),
     });
 
-    const data = await res.json() as { status_message?: string; message?: string; errors?: string[] };
+    const data = await res.json() as { messageId?: string; message?: string; code?: string };
 
     if (!res.ok) {
-      console.error("[email] Insider error:", JSON.stringify(data));
+      console.error("[email] Brevo error:", JSON.stringify(data));
     } else {
-      console.log(`[email] Sent via Insider: "${payload.subject}" to ${recipients.length} recipients`);
+      console.log(`[email] Sent via Brevo: "${payload.subject}" to ${recipients.length} recipients`);
     }
   } catch (err) {
-    console.error("[email] Failed to send:", err instanceof Error ? err.message : String(err));
+    console.error("[email] Failed:", err instanceof Error ? err.message : String(err));
   }
 }

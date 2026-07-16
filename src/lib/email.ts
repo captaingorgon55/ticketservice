@@ -82,13 +82,16 @@ export type EmailPayload = {
   ticketUrl: string;
   bodyHtml: string;
   extraRecipients?: string[];
+  /** Si true, solo envía a extraRecipients (ignora NOTIFY_EMAILS) */
+  onlyDirect?: boolean;
 };
 
 export async function notifyTicketActivity(payload: EmailPayload): Promise<void> {
   if (!SENDGRID_API_KEY) return;
 
+  const base = payload.onlyDirect ? [] : NOTIFY_EMAILS;
   const recipients = [
-    ...NOTIFY_EMAILS,
+    ...base,
     ...(payload.extraRecipients ?? []),
   ].filter(Boolean).filter((e, i, arr) => arr.indexOf(e) === i);
 

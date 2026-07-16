@@ -144,6 +144,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       ticketTitle: ticket.title,
       ticketUrl: `${APP_URL}/tickets/${id}`,
       extraRecipients,
+      onlyDirect: true,
       bodyHtml: `
         <p style="font-size:13px;color:#666;margin:0 0 8px;">Actualizado por <strong style="color:#333;">${esc(updaterName)}</strong></p>
         <div style="padding:12px;background:#f9fafb;border-radius:8px;font-size:13px;color:#333;line-height:1.6;">${changes.map(c => esc(c)).join("<br>")}</div>

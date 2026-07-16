@@ -73,6 +73,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     ticketTitle: ticket.title,
     ticketUrl: `${APP_URL}/tickets/${id}`,
     extraRecipients,
+    onlyDirect: true,
     bodyHtml: `
       <p style="font-size:13px;color:#666;margin:0 0 4px;">
         <strong style="color:#333;">${esc(authorName?.name as string ?? "—")}</strong> comentó:

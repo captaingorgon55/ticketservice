@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -802,7 +802,7 @@ function WelcomeBanner({ stats }: { stats?: Stats }) {
 
 // ── Main Page ────────────────────────────────────────
 
-export default function DashboardPage() {
+function DashboardInner() {
   const [showCreate, setShowCreate] = useState(false);
   const { data: session }           = useSession();
   const role = (session?.user as { role?: string })?.role;
@@ -815,5 +815,13 @@ export default function DashboardPage() {
       }
       {showCreate && <CreateTicketModal onClose={() => setShowCreate(false)} />}
     </>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense>
+      <DashboardInner />
+    </Suspense>
   );
 }

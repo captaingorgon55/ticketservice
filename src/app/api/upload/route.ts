@@ -21,6 +21,9 @@ export async function POST(req: NextRequest) {
   const file = formData.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "No se recibió archivo" }, { status: 400 });
 
+  const ticketNumber = formData.get("ticketNumber") as string | null;
+  const ticketTitle  = formData.get("ticketTitle")  as string | null;
+
   try {
     const credentials = JSON.parse(SERVICE_ACCOUNT) as object;
     const driveAuth = new google.auth.GoogleAuth({
@@ -30,13 +33,49 @@ export async function POST(req: NextRequest) {
 
     const drive = google.drive({ version: "v3", auth: driveAuth });
 
+    // ── Crear o encontrar subcarpeta del ticket ──────────
+    let targetFolderId = FOLDER_ID;
+
+    if (ticketNumber) {
+      const folderName = ticketTitle
+        ? `#${ticketNumber} - ${ticketTitle.slice(0, 60)}`
+        : `Ticket #${ticketNumber}`;
+
+      // Buscar si ya existe
+      const existing = await drive.files.list({
+        q: `name='${folderName.replace(/'/g, "\\'")}' and '${FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+        fields: "files(id)",
+        pageSize: 1,
+      });
+
+      if (existing.data.files && existing.data.files.length > 0) {
+        targetFolderId = existing.data.files[0].id!;
+      } else {
+        const newFolder = await drive.files.create({
+          requestBody: {
+            name: folderName,
+            mimeType: "application/vnd.google-apps.folder",
+            parents: [FOLDER_ID],
+          },
+          fields: "id",
+        });
+        targetFolderId = newFolder.data.id!;
+        // Hacer la carpeta accesible con link
+        await drive.permissions.create({
+          fileId: targetFolderId,
+          requestBody: { role: "reader", type: "anyone" },
+        });
+      }
+    }
+
+    // ── Subir el archivo a la carpeta del ticket ─────────
     const buffer = Buffer.from(await file.arrayBuffer());
     const stream = Readable.from(buffer);
 
     const uploaded = await drive.files.create({
       requestBody: {
         name: file.name,
-        parents: [FOLDER_ID],
+        parents: [targetFolderId],
       },
       media: {
         mimeType: file.type || "application/octet-stream",
@@ -47,15 +86,13 @@ export async function POST(req: NextRequest) {
 
     const fileId = uploaded.data.id!;
 
-    // Hacer el archivo accesible con el link (solo lectura)
     await drive.permissions.create({
       fileId,
       requestBody: { role: "reader", type: "anyone" },
     });
 
     const url = uploaded.data.webViewLink ?? `https://drive.google.com/file/d/${fileId}/view`;
-
-    console.log(`[upload] Archivo subido a Drive: ${file.name} → ${url}`);
+    console.log(`[upload] ${file.name} → carpeta #${ticketNumber ?? "general"} en Drive`);
     return NextResponse.json({ url, name: file.name, type: file.type });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

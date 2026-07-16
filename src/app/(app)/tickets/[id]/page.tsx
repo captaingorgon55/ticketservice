@@ -188,6 +188,8 @@ export default function TicketDetailPage() {
       const uploaded = await Promise.all(newFiles.map(async (file) => {
         const fd = new FormData();
         fd.append("file", file);
+        fd.append("ticketNumber", String(ticket.ticketNumber));
+        fd.append("ticketTitle", ticket.title);
         const res = await fetch("/api/upload", { method: "POST", body: fd });
         const data = await res.json() as { url?: string; error?: string };
         if (!res.ok || !data.url) throw new Error(data.error ?? "Error al subir");
@@ -551,6 +553,8 @@ export default function TicketDetailPage() {
               attachments = await Promise.all(files.map(async (f) => {
                 const fd = new FormData();
                 fd.append("file", f);
+                fd.append("ticketNumber", String(ticket.ticketNumber));
+                fd.append("ticketTitle", ticket.title);
                 const res = await fetch("/api/upload", { method: "POST", body: fd });
                 const data = await res.json() as { url?: string; error?: string };
                 if (!data.url) throw new Error(data.error ?? "Error al subir");

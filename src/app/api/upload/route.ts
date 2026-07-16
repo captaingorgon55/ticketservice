@@ -25,7 +25,8 @@ export async function POST(req: NextRequest) {
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const folder    = ticketNumber ? `solicitudes-im/ticket-${ticketNumber}` : "solicitudes-im";
 
-  const str     = `folder=${folder}&timestamp=${timestamp}${API_SECRET}`;
+  // Parámetros firmados ordenados alfabéticamente (requerido por Cloudinary)
+  const str     = `access_mode=public&folder=${folder}&timestamp=${timestamp}${API_SECRET}`;
   const msgBuf  = new TextEncoder().encode(str);
   const hashBuf = await crypto.subtle.digest("SHA-1", msgBuf);
   const signature = Array.from(new Uint8Array(hashBuf))
@@ -33,11 +34,12 @@ export async function POST(req: NextRequest) {
     .join("");
 
   const cd = new FormData();
-  cd.append("file",      file);
-  cd.append("api_key",   API_KEY);
-  cd.append("timestamp", timestamp);
-  cd.append("signature", signature);
-  cd.append("folder",    folder);
+  cd.append("file",        file);
+  cd.append("api_key",     API_KEY);
+  cd.append("timestamp",   timestamp);
+  cd.append("signature",   signature);
+  cd.append("folder",      folder);
+  cd.append("access_mode", "public");
 
   const res = await fetch(
     `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`,

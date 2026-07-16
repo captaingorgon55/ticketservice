@@ -1,26 +1,10 @@
-import nodemailer from "nodemailer";
+import sgMail from "@sendgrid/mail";
 
-const GMAIL_SENDER       = process.env.GMAIL_SENDER ?? "";
-const GMAIL_APP_PASSWORD = (process.env.GMAIL_APP_PASSWORD ?? "").replace(/\s/g, "");
+const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY ?? "";
+const EMAIL_FROM       = process.env.EMAIL_FROM ?? "";
 
 const NOTIFY_EMAILS = (process.env.NOTIFY_EMAILS ?? "")
-  .split(",")
-  .map((e) => e.trim())
-  .filter(Boolean);
-
-let _transporter: nodemailer.Transporter | null = null;
-
-function getTransporter() {
-  if (!_transporter) {
-    _transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 587,
-      secure: false,
-      auth: { user: GMAIL_SENDER, pass: GMAIL_APP_PASSWORD },
-    });
-  }
-  return _transporter;
-}
+  .split(",").map((e) => e.trim()).filter(Boolean);
 
 function buildHtml(opts: {
   subject: string; ticketNumber: number; ticketTitle: string;
@@ -59,36 +43,31 @@ export type EmailPayload = {
 };
 
 export async function notifyTicketActivity(payload: EmailPayload): Promise<void> {
-  if (!GMAIL_SENDER || !GMAIL_APP_PASSWORD) {
-    console.log("[email] Skipped: GMAIL_SENDER o GMAIL_APP_PASSWORD no configurados");
-    return;
-  }
+  if (!SENDGRID_API_KEY || !EMAIL_FROM) return;
 
   const base = payload.onlyDirect ? [] : NOTIFY_EMAILS;
   const recipients = [...base, ...(payload.extraRecipients ?? [])]
-    .filter(Boolean).filter((e, i, arr) => arr.indexOf(e) === i);
+    .filter(Boolean)
+    .filter((e) => e.includes("@") && !e.endsWith("@helpdesk.com"))
+    .filter((e, i, arr) => arr.indexOf(e) === i);
 
   if (recipients.length === 0) {
-    console.log("[email] Skipped: sin destinatarios");
+    console.log("[email] Skipped: sin destinatarios válidos");
     return;
   }
 
-  console.log(`[email] Intentando enviar a: ${recipients.join(", ")}`);
+  console.log(`[email] Enviando a: ${recipients.join(", ")}`);
 
   try {
-    const transporter = getTransporter();
-    await transporter.verify();
-    console.log("[email] SMTP verificado OK");
-    const html = buildHtml(payload);
-    await transporter.sendMail({
-      from: `"Solicitudes IM" <${GMAIL_SENDER}>`,
-      to: recipients.join(","),
+    sgMail.setApiKey(SENDGRID_API_KEY);
+    await sgMail.send({
+      from: EMAIL_FROM,
+      to: recipients,
       subject: payload.subject,
-      html,
+      html: buildHtml(payload),
     });
     console.log(`[email] Sent: "${payload.subject}" to ${recipients.length} recipients`);
   } catch (err) {
     console.error("[email] Failed to send:", err instanceof Error ? err.message : String(err));
-    console.error("[email] Error completo:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
   }
 }

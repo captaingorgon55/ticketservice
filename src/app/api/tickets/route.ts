@@ -33,7 +33,7 @@ async function aiAutoAssign(ticket: {
       })
     );
 
-    const model = getJsonModel("gemini-2.5-flash");
+    const model = getJsonModel("gemini-2.0-flash");
     const prompt = `Eres un sistema de asignación de tickets de help desk para el equipo de Inteligencia de Mercados de un periódico.
 
 Ticket a asignar:

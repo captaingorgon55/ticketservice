@@ -167,7 +167,7 @@ function StatCard({
 
 // ── Create Ticket Modal ──────────────────────────────
 
-async function uploadFile(file: File): Promise<{ name: string; url: string; type: string }> {
+async function uploadFile(file: File): Promise<{ name: string; url: string; fileType: string }> {
   const fd = new FormData();
   fd.append("file", file);
   const res = await fetch("/api/upload", { method: "POST", body: fd });
@@ -219,7 +219,7 @@ function CreateTicketModal({ onClose }: { onClose: () => void }) {
       setError("Título y descripción son obligatorios");
       return;
     }
-    let attachments: { name: string; url: string; type: string }[] = [];
+    let attachments: { name: string; url: string; fileType: string }[] = [];
     if (files.length > 0) {
       setUploading(true);
       try {

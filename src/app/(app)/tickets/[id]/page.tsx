@@ -48,7 +48,7 @@ interface TicketDetail {
   baseText?: string | null;
   mustInclude?: string | null;
   supportingMaterials?: string | null;
-  attachments?: { name: string; url: string; type: string }[];
+  attachments?: { name: string; url: string; fileType: string }[];
   participants?: UserRef[];
 }
 
@@ -172,7 +172,7 @@ export default function TicketDetailPage() {
   });
 
   const commentMut = useMutation({
-    mutationFn: (body: { content: string; attachments?: { name: string; url: string; type: string }[] }) =>
+    mutationFn: (body: { content: string; attachments?: { name: string; url: string; fileType: string }[] }) =>
       apiFetch(`/api/tickets/${id}/comments`, { method: "POST", body: JSON.stringify(body) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ticket", id] }),
   });
@@ -561,7 +561,7 @@ export default function TicketDetailPage() {
       <div className="bg-white rounded-xl border border-gray-200 p-4 fade-in">
         <CommentInput
           onSubmit={async (content, files) => {
-            let attachments: { name: string; url: string; type: string }[] = [];
+            let attachments: { name: string; url: string; fileType: string }[] = [];
             if (files.length > 0) {
               attachments = await Promise.all(files.map(async (f) => {
                 const fd = new FormData();

@@ -1,33 +1,14 @@
-import nodemailer from "nodemailer";
+import sgMail from "@sendgrid/mail";
 
 // ── Config ──────────────────────────────────────────
 
-const GMAIL_SENDER       = process.env.GMAIL_SENDER ?? "";
-const GMAIL_APP_PASSWORD = (process.env.GMAIL_APP_PASSWORD ?? "").replace(/\s/g, "");
+const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY ?? "";
+const EMAIL_FROM       = process.env.EMAIL_FROM ?? "";
 
 const NOTIFY_EMAILS = (process.env.NOTIFY_EMAILS ?? "")
   .split(",")
   .map((e) => e.trim())
   .filter(Boolean);
-
-// ── Transport (lazy singleton) ──────────────────────
-
-let _transporter: nodemailer.Transporter | null = null;
-
-function getTransporter() {
-  if (!_transporter) {
-    _transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 587,
-      secure: false,
-      auth: {
-        user: GMAIL_SENDER,
-        pass: GMAIL_APP_PASSWORD,
-      },
-    });
-  }
-  return _transporter;
-}
 
 // ── HTML template ───────────────────────────────────
 
@@ -105,7 +86,7 @@ export type EmailPayload = {
 };
 
 export async function notifyTicketActivity(payload: EmailPayload): Promise<void> {
-  if (!GMAIL_SENDER || !GMAIL_APP_PASSWORD) return;
+  if (!SENDGRID_API_KEY || !EMAIL_FROM) return;
 
   const base = payload.onlyDirect ? [] : NOTIFY_EMAILS;
   const recipients = [
@@ -116,11 +97,11 @@ export async function notifyTicketActivity(payload: EmailPayload): Promise<void>
   if (recipients.length === 0) return;
 
   try {
-    const transporter = getTransporter();
+    sgMail.setApiKey(SENDGRID_API_KEY);
     const html = buildHtml(payload);
-    await transporter.sendMail({
-      from: `"Solicitudes IM" <${GMAIL_SENDER}>`,
-      to: recipients.join(","),
+    await sgMail.send({
+      from: EMAIL_FROM,
+      to: recipients,
       subject: payload.subject,
       html,
     });

@@ -117,7 +117,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   let newlyAddedParticipantIds: string[] = [];
   if (Array.isArray(newParticipants)) {
     const prevIds    = (ticket.participants ?? []).map((p: unknown) => String(p));
-    const removedIds = prevIds.filter((id) => !newParticipants.includes(id));
+    const removedIds = prevIds.filter((id: string) => !newParticipants.includes(id));
     newlyAddedParticipantIds = newParticipants.filter((id) => !prevIds.includes(id));
 
     if (newlyAddedParticipantIds.length > 0) {

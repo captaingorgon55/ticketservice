@@ -107,6 +107,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (mustInclude !== undefined && typeof mustInclude === "string") ticket.mustInclude = mustInclude.trim() || null;
   if (supportingMaterials !== undefined && typeof supportingMaterials === "string") ticket.supportingMaterials = supportingMaterials.trim() || null;
 
+  const { addAttachments } = body as { addAttachments?: { name: string; url: string; type: string }[] };
+  if (Array.isArray(addAttachments) && addAttachments.length > 0) {
+    ticket.attachments = [...(ticket.attachments ?? []), ...addAttachments];
+    changes.push(`Archivos adjuntos: +${addAttachments.length} archivo(s)`);
+  }
+
   await ticket.save();
 
   if (changes.length > 0) {

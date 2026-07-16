@@ -88,7 +88,8 @@ export default function TicketDetailPage() {
   const router = useRouter();
   const qc = useQueryClient();
   const [newComment, setNewComment] = useState("");
-  const [showAISuggest, setShowAISuggest] = useState(false);
+  const [newFiles, setNewFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   const { data, isLoading } = useQuery<{ ticket: TicketDetail; comments: Comment[] }>({
     queryKey: ["ticket", id],
@@ -116,13 +117,26 @@ export default function TicketDetailPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ticket", id] }),
   });
 
-  const aiSuggestMut = useMutation({
-    mutationFn: () => apiFetch(`/api/tickets/${id}/ai-suggest`, { method: "POST" }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["ticket", id] });
-      setShowAISuggest(false);
-    },
-  });
+  async function handleUploadAttachments() {
+    if (newFiles.length === 0) return;
+    setUploading(true);
+    try {
+      const uploaded = await Promise.all(newFiles.map(async (file) => {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch("/api/upload", { method: "POST", body: fd });
+        const data = await res.json() as { url?: string; error?: string };
+        if (!res.ok || !data.url) throw new Error(data.error ?? "Error al subir");
+        return { name: file.name, url: data.url, type: file.type };
+      }));
+      await updateMut.mutateAsync({ addAttachments: uploaded });
+      setNewFiles([]);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Error al subir archivos");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -327,78 +341,48 @@ export default function TicketDetailPage() {
         </div>
       </div>
 
-      {/* AI Suggestion */}
+      {/* Adjuntos */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden fade-in">
-        <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles size={16} className="text-violet-500" />
-            <span className="text-sm font-semibold text-gray-700">Asistente IA</span>
-          </div>
-          {!aiSuggestion && (
-            <button
-              onClick={() => aiSuggestMut.mutate()}
-              disabled={aiSuggestMut.isPending}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-xs font-medium transition disabled:opacity-50"
-            >
-              {aiSuggestMut.isPending ? <Loader2 size={12} className="animate-spin" /> : <Bot size={12} />}
-              {aiSuggestMut.isPending ? "Analizando…" : "Analizar con IA"}
-            </button>
-          )}
+        <div className="px-5 py-3.5 border-b border-gray-100">
+          <span className="text-sm font-semibold text-gray-700">📎 Archivos adjuntos</span>
         </div>
-        {aiSuggestion ? (
-          <div className="p-5 space-y-4 text-sm">
-            <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Enfoque</p>
-              <p className="text-gray-700">{aiSuggestion.approach}</p>
+        <div className="p-5 space-y-3">
+          {ticket.attachments && ticket.attachments.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {ticket.attachments.map((a, i) => (
+                <a
+                  key={i}
+                  href={a.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 hover:bg-red-50 hover:border-red-200 hover:text-red-700 transition"
+                >
+                  📎 {a.name}
+                </a>
+              ))}
             </div>
-            {aiSuggestion.steps && aiSuggestion.steps.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Pasos sugeridos</p>
-                <ol className="list-decimal list-inside space-y-1.5">
-                  {aiSuggestion.steps.map((step, i) => (
-                    <li key={i} className="text-gray-600">{step}</li>
-                  ))}
-                </ol>
-              </div>
-            )}
-            {aiSuggestion.tools && aiSuggestion.tools.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Herramientas / Fuentes</p>
-                <div className="flex flex-wrap gap-2">
-                  {aiSuggestion.tools.map((tool, i) => (
-                    <span key={i} className="px-2.5 py-1 bg-gray-100 text-gray-600 rounded text-xs">{tool}</span>
-                  ))}
-                </div>
-              </div>
-            )}
-            {aiSuggestion.keyInsight && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <p className="text-xs font-semibold text-amber-700 mb-0.5">💡 Consideración clave</p>
-                <p className="text-xs text-amber-800">{aiSuggestion.keyInsight}</p>
-              </div>
-            )}
-            {aiSuggestion.estimatedEffort && (
-              <div className="flex items-center gap-4 text-xs text-gray-500">
-                <span>
-                  Esfuerzo estimado: <strong className={
-                    aiSuggestion.estimatedEffort === "baja" ? "text-green-600" :
-                    aiSuggestion.estimatedEffort === "alta" ? "text-red-600" : "text-amber-600"
-                  }>{aiSuggestion.estimatedEffort}</strong>
-                </span>
-                {aiSuggestion.suggestedPriority && (
-                  <span>
-                    Prioridad sugerida: <strong>{aiSuggestion.suggestedPriority}</strong>
-                  </span>
-                )}
-              </div>
+          ) : (
+            <p className="text-xs text-gray-400">Sin archivos adjuntos</p>
+          )}
+          <div className="flex items-center gap-3 pt-2 border-t border-gray-50">
+            <input
+              type="file"
+              multiple
+              onChange={(e) => setNewFiles(Array.from(e.target.files ?? []))}
+              className="flex-1 text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-gray-100 file:text-gray-600 hover:file:bg-gray-200"
+            />
+            {newFiles.length > 0 && (
+              <button
+                onClick={handleUploadAttachments}
+                disabled={uploading}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-medium transition disabled:opacity-50"
+              >
+                {uploading ? <Loader2 size={12} className="animate-spin" /> : null}
+                {uploading ? "Subiendo…" : `Subir ${newFiles.length} archivo(s)`}
+              </button>
             )}
           </div>
-        ) : (
-          <div className="p-6 text-center">
-            <Bot size={32} className="mx-auto text-gray-300 mb-2" />
-            <p className="text-sm text-gray-400">Presiona "Analizar con IA" para obtener una recomendación</p>
-          </div>
-        )}
+        </div>
       </div>
 
       {/* Comments timeline */}

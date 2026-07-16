@@ -43,6 +43,27 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Ticket no encontrado" }, { status: 404 });
   }
 
+  function isRateLimit(err: unknown): boolean {
+    const msg = err instanceof Error ? err.message : String(err);
+    return msg.includes("quota") || msg.includes("429") || msg.includes("rate") || msg.includes("retry");
+  }
+
+  async function withRetry<T>(fn: () => Promise<T>, retries = 2, delayMs = 10000): Promise<T> {
+    for (let i = 0; i <= retries; i++) {
+      try {
+        return await fn();
+      } catch (err) {
+        if (i < retries && isRateLimit(err)) {
+          console.log(`[ai-suggest] Rate limit — reintentando en ${delayMs / 1000}s`);
+          await new Promise((r) => setTimeout(r, delayMs));
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw new Error("Max retries exceeded");
+  }
+
   try {
     const model = getJsonModel("gemini-2.0-flash");
 
@@ -64,7 +85,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       ],
     });
 
-    const result = await chat.sendMessage(ticketContext);
+    const result = await withRetry(() => chat.sendMessage(ticketContext));
 
     const suggestion = JSON.parse(result.response.text()) as {
       approach: string;
@@ -80,7 +101,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     await Ticket.findByIdAndUpdate(id, {
       aiSuggestion: suggestionText,
       aiSuggestionAt: new Date(),
-      aiSuggestionBy: "Gemini 2.5 Flash",
+      aiSuggestionBy: "Gemini 2.0 Flash",
     });
 
     return NextResponse.json({ suggestion });

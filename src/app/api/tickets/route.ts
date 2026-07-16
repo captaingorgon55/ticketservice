@@ -7,36 +7,69 @@ import { notifyTicketActivity, esc } from "@/lib/email";
 import { User } from "@/models/User";
 import { getJsonModel } from "@/lib/gemini";
 
+// ── Helpers ─────────────────────────────────────────
+
+function isRateLimit(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.includes("quota") || msg.includes("429") || msg.includes("rate") || msg.includes("retry");
+}
+
+async function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function withRetry<T>(fn: () => Promise<T>, retries = 2, delayMs = 8000): Promise<T> {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (i < retries && isRateLimit(err)) {
+        console.log(`[gemini] Rate limit — reintentando en ${delayMs / 1000}s (intento ${i + 1}/${retries})`);
+        await sleep(delayMs);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("Max retries exceeded");
+}
+
 // ── AI auto-assignment ──────────────────────────────
 
+type AssignResult = { userId: string; userName: string; reason: string };
+
+async function getWorkload() {
+  const analysts = await User.find({ isActive: true, role: "analista" })
+    .select("_id name area").lean();
+
+  return Promise.all(
+    analysts.map(async (a) => {
+      const open = await Ticket.countDocuments({
+        assignedTo: a._id, isActive: true,
+        status: { $in: ["abierto", "en_progreso", "en_revision"] },
+      });
+      return { id: String(a._id), name: String(a.name), area: String(a.area ?? ""), open };
+    })
+  );
+}
+
+function fallbackAssign(workload: { id: string; name: string; open: number }[]): AssignResult | null {
+  if (workload.length === 0) return null;
+  const least = [...workload].sort((a, b) => a.open - b.open)[0];
+  return { userId: least.id, userName: least.name, reason: "Asignado por menor carga de trabajo" };
+}
+
 async function aiAutoAssign(ticket: {
-  title: string;
-  description: string;
-  category: string;
-}): Promise<{ userId: string; userName: string; reason: string } | null> {
+  title: string; description: string; category: string;
+}): Promise<AssignResult | null> {
   try {
-    const analysts = await User.find({ isActive: true, role: "analista" })
-      .select("_id name area")
-      .lean();
-
-    if (analysts.length === 0) return null;
-
-    // Get open ticket count per analyst
-    const workload = await Promise.all(
-      analysts.map(async (a) => {
-        const open = await Ticket.countDocuments({
-          assignedTo: a._id,
-          isActive: true,
-          status: { $in: ["abierto", "en_progreso", "en_revision"] },
-        });
-        return { id: String(a._id), name: a.name, area: a.area ?? "", open };
-      })
-    );
+    const workload = await getWorkload();
+    if (workload.length === 0) return null;
 
     const model = getJsonModel("gemini-2.0-flash");
-    const prompt = `Eres un sistema de asignación de tickets de help desk para el equipo de Inteligencia de Mercados de un periódico.
+    const prompt = `Eres un sistema de asignación de tickets para el equipo de Inteligencia de Mercados de un periódico.
 
-Ticket a asignar:
+Ticket:
 - Título: ${ticket.title}
 - Categoría: ${ticket.category}
 - Descripción: ${ticket.description}
@@ -44,28 +77,23 @@ Ticket a asignar:
 Analistas disponibles:
 ${workload.map((w) => `- ID: ${w.id} | Nombre: ${w.name} | Área: ${w.area} | Tickets activos: ${w.open}`).join("\n")}
 
-Asigna el ticket al analista más adecuado según:
-1. Relevancia del área con el tipo de ticket
-2. Menor carga de trabajo actual
-3. Especialización en la categoría
+Asigna al analista más adecuado según área, especialización y menor carga.
+Responde SOLO con JSON (sin markdown):
+{"userId":"<id>","userName":"<nombre>","reason":"<razón breve>"}`;
 
-Responde SOLO con este JSON (sin markdown):
-{"userId":"<id_del_analista>","userName":"<nombre>","reason":"<razón breve en español>"}`;
-
-    const result = await model.generateContent(prompt);
-    const parsed = JSON.parse(result.response.text()) as {
-      userId: string;
-      userName: string;
-      reason: string;
-    };
-
+    const result = await withRetry(() => model.generateContent(prompt));
+    const parsed = JSON.parse(result.response.text()) as AssignResult;
     const valid = workload.find((w) => w.id === parsed.userId);
-    if (!valid) return null;
-
+    if (!valid) return fallbackAssign(workload);
     return parsed;
   } catch (err) {
-    console.error("[auto-assign] Error:", err instanceof Error ? err.message : err);
-    return null;
+    console.error("[auto-assign] Gemini falló, usando fallback:", err instanceof Error ? err.message : err);
+    try {
+      const workload = await getWorkload();
+      return fallbackAssign(workload);
+    } catch {
+      return null;
+    }
   }
 }
 

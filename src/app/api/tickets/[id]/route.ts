@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import dbConnect from "@/lib/dbConnect";
 import { Ticket } from "@/models/Ticket";
 import { TicketComment } from "@/models/TicketComment";
+import { User } from "@/models/User";
 import { notifyTicketActivity, esc } from "@/lib/email";
 
 async function requireAuth() {
@@ -113,7 +114,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     participants?: string[];
   };
 
+  let newlyAddedParticipantIds: string[] = [];
   if (Array.isArray(newParticipants)) {
+    const prevIds = (ticket.participants ?? []).map((p) => String(p));
+    newlyAddedParticipantIds = newParticipants.filter((id) => !prevIds.includes(id));
     ticket.participants = newParticipants as unknown as typeof ticket.participants;
   }
   if (Array.isArray(addAttachments) && addAttachments.length > 0) {
@@ -164,6 +168,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         <div style="padding:12px;background:#f9fafb;border-radius:8px;font-size:13px;color:#333;line-height:1.6;">${changes.map(c => esc(c)).join("<br>")}</div>
       `,
     });
+
+    // ── Notificar a nuevos participantes ──
+    if (newlyAddedParticipantIds.length > 0) {
+      const newUsers = await User.find({ _id: { $in: newlyAddedParticipantIds } }).select("email name").lean();
+      const newEmails = newUsers.map((u) => u.email).filter(Boolean) as string[];
+      if (newEmails.length > 0) {
+        notifyTicketActivity({
+          subject: `👥 Te agregaron al ticket #${ticket.ticketNumber}: ${ticket.title}`,
+          ticketNumber: ticket.ticketNumber,
+          ticketTitle: ticket.title,
+          ticketUrl: `${APP_URL}/tickets/${id}`,
+          extraRecipients: newEmails,
+          onlyDirect: true,
+          bodyHtml: `
+            <p style="font-size:13px;color:#666;margin:0 0 8px;">
+              <strong style="color:#333;">${esc(updaterName)}</strong> te agregó como participante en este ticket.
+            </p>
+            <p style="font-size:13px;color:#333;margin:0;">Ahora recibirás notificaciones sobre la actividad de esta solicitud.</p>
+          `,
+        });
+      }
+    }
   }
 
   return NextResponse.json({ ticket: populated });

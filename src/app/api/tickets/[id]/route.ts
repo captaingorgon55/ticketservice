@@ -116,13 +116,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   let newlyAddedParticipantIds: string[] = [];
   if (Array.isArray(newParticipants)) {
-    const prevIds = (ticket.participants ?? []).map((p: unknown) => String(p));
+    const prevIds    = (ticket.participants ?? []).map((p: unknown) => String(p));
+    const removedIds = prevIds.filter((id) => !newParticipants.includes(id));
     newlyAddedParticipantIds = newParticipants.filter((id) => !prevIds.includes(id));
+
+    if (newlyAddedParticipantIds.length > 0) {
+      const added = await User.find({ _id: { $in: newlyAddedParticipantIds } }).select("name").lean();
+      added.forEach((u) => changes.push(`👥 Participante agregado: ${u.name}`));
+    }
+    if (removedIds.length > 0) {
+      const removed = await User.find({ _id: { $in: removedIds } }).select("name").lean();
+      removed.forEach((u) => changes.push(`👥 Participante eliminado: ${u.name}`));
+    }
     ticket.participants = newParticipants as unknown as typeof ticket.participants;
   }
   if (Array.isArray(addAttachments) && addAttachments.length > 0) {
     ticket.attachments = [...(ticket.attachments ?? []), ...addAttachments];
-    changes.push(`Archivos adjuntos: +${addAttachments.length} archivo(s)`);
+    addAttachments.forEach((a) => changes.push(`📎 Archivo adjunto: ${a.name}`));
   }
 
   await ticket.save();

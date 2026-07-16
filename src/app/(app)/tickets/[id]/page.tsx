@@ -7,6 +7,7 @@ import {
   ArrowLeft, Send, Loader2, Clock, CheckCircle2,
   AlertCircle, MessageSquare, FileText, PenLine, Link as LinkIcon, Target, CalendarDays, Copy, Users, Bot, User,
 } from "lucide-react";
+// CalendarDays y Target importados para uso futuro
 import { TICKET_STATUSES, TICKET_PRIORITIES, TICKET_CATEGORIES } from "@/lib/constants";
 
 // ── Types ───────────────────────────────────────────
@@ -65,14 +66,15 @@ async function apiFetch(url: string, init?: RequestInit) {
   return res.json();
 }
 
-function getCommentIcon(type: string) {
-  switch (type) {
-    case "system":       return <Bot size={14} />;
-    case "status_change":return <Clock size={14} />;
-    case "assignment":   return <User size={14} />;
-    case "resolution":   return <CheckCircle2 size={14} />;
-    default:             return <MessageSquare size={14} />;
-  }
+function getActivityStyle(content: string, type: string) {
+  if (type !== "system") return { icon: <MessageSquare size={13} />, bg: "bg-red-50 text-red-500", label: null };
+  if (content.includes("Estado:"))           return { icon: <Clock size={13} />,        bg: "bg-blue-50 text-blue-500",   label: "Estado" };
+  if (content.includes("Asignado:"))         return { icon: <User size={13} />,         bg: "bg-amber-50 text-amber-500", label: "Asignación" };
+  if (content.includes("Prioridad:"))        return { icon: <AlertCircle size={13} />,  bg: "bg-orange-50 text-orange-500", label: "Prioridad" };
+  if (content.includes("Participante"))      return { icon: <Users size={13} />,        bg: "bg-purple-50 text-purple-500", label: "Participante" };
+  if (content.includes("adjunto") || content.includes("📎")) return { icon: <FileText size={13} />, bg: "bg-green-50 text-green-500", label: "Archivo" };
+  if (content.includes("creado"))            return { icon: <CheckCircle2 size={13} />, bg: "bg-gray-100 text-gray-500",   label: "Creación" };
+  return { icon: <Bot size={13} />, bg: "bg-gray-100 text-gray-400", label: "Sistema" };
 }
 
 function CommentInput({
@@ -512,34 +514,45 @@ export default function TicketDetailPage() {
               <p className="text-xs text-gray-400">Sin actividad registrada</p>
             </div>
           ) : (
-            comments.map((comment) => (
-              <div key={comment._id} className="px-5 py-3.5 flex gap-3">
-                <div
-                  className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                    comment.type === "system"
-                      ? "bg-gray-100 text-gray-400"
-                      : "bg-red-50 text-red-500"
-                  }`}
-                >
-                  {getCommentIcon(comment.type)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-sm font-medium text-gray-700">
-                      {comment.type === "system" ? "Sistema" : comment.author.name}
-                    </span>
-                    <span className="text-xs text-gray-400">{formatDate(comment.createdAt)}</span>
+            comments.map((comment) => {
+              const isSystem = comment.type === "system";
+              const { icon, bg, label } = getActivityStyle(comment.content, comment.type);
+              const lines = comment.content?.split("\n").filter(Boolean) ?? [];
+              return (
+                <div key={comment._id} className="px-5 py-3.5 flex gap-3">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${bg}`}>
+                    {icon}
                   </div>
-                  {comment.content && <p className="text-sm text-gray-600 whitespace-pre-wrap">{comment.content}</p>}
-                  {(comment.metadata?.attachments as { name: string; url: string }[] | undefined)?.map((a, i) => (
-                    <a key={i} href={a.url} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-red-600 hover:underline mt-1">
-                      📎 {a.name}
-                    </a>
-                  ))}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="text-sm font-medium text-gray-700">
+                        {isSystem ? (label ?? "Sistema") : comment.author?.name ?? "Usuario"}
+                      </span>
+                      <span className="text-xs text-gray-400">{formatDate(comment.createdAt)}</span>
+                    </div>
+                    {isSystem ? (
+                      <div className="space-y-1">
+                        {lines.map((line, i) => (
+                          <p key={i} className="text-xs text-gray-600 bg-gray-50 rounded px-2 py-1 inline-block mr-1 mb-1">
+                            {line}
+                          </p>
+                        ))}
+                      </div>
+                    ) : (
+                      <>
+                        {comment.content && <p className="text-sm text-gray-700 whitespace-pre-wrap">{comment.content}</p>}
+                        {(comment.metadata?.attachments as { name: string; url: string }[] | undefined)?.map((a, i) => (
+                          <a key={i} href={a.url} target="_blank" rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-red-600 hover:underline mt-1 mr-2">
+                            📎 {a.name}
+                          </a>
+                        ))}
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            }))
           )}
         </div>
       </div>

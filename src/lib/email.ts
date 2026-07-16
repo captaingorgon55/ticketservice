@@ -60,7 +60,10 @@ export type EmailPayload = {
 };
 
 export async function notifyTicketActivity(payload: EmailPayload): Promise<void> {
-  if (!INSIDER_API_KEY) return;
+  if (!INSIDER_API_KEY) {
+    console.log("[email] INSIDER_API_KEY no configurada — omitiendo envío");
+    return;
+  }
 
   const base = payload.onlyDirect ? [] : NOTIFY_EMAILS;
   const recipients = [...base, ...(payload.extraRecipients ?? [])]

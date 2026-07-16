@@ -28,12 +28,13 @@ export interface ITicket {
   resolution: string | null;
   isActive: boolean;
   // ── Campos específicos para solicitudes de publicación ──
-  journalistName: string | null;       // Nombre del periodista solicitante
-  objective: string | null;             // ¿Qué queremos comunicar?
-  strategicTiming: string | null;       // ¿Cuándo publicar?
-  baseText: string | null;              // Texto base para la publicación
-  mustInclude: string | null;           // ¿Hay algo que no podamos dejar por fuera?
-  supportingMaterials: string | null;   // Información de apoyo
+  journalistName: string | null;
+  objective: string | null;
+  strategicTiming: string | null;
+  baseText: string | null;
+  mustInclude: string | null;
+  supportingMaterials: string | null;
+  attachments: { name: string; url: string; type: string }[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -80,6 +81,10 @@ const TicketSchema = new Schema<ITicket>(
     baseText:             { type: String, default: null, maxlength: 10000 },
     mustInclude:          { type: String, default: null, maxlength: 3000 },
     supportingMaterials:  { type: String, default: null, maxlength: 5000 },
+  attachments: {
+    type: [{ name: String, url: String, type: String }],
+    default: [],
+  },
   },
   { timestamps: true }
 );

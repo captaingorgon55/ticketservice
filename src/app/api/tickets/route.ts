@@ -172,11 +172,13 @@ export async function POST(req: NextRequest) {
   const {
     title, description, category, source, assignedTo, tags, dueDate,
     journalistName, objective, strategicTiming, baseText, mustInclude, supportingMaterials,
+    attachments,
   } = body as {
     title?: string; description?: string; category?: string; source?: string;
     assignedTo?: string | null; tags?: string[]; dueDate?: string | null;
     journalistName?: string; objective?: string; strategicTiming?: string;
     baseText?: string; mustInclude?: string; supportingMaterials?: string;
+    attachments?: { name: string; url: string; type: string }[];
   };
 
   if (!title || !description || !category) {
@@ -223,6 +225,7 @@ export async function POST(req: NextRequest) {
     baseText:             baseText?.trim() || null,
     mustInclude:          mustInclude?.trim() || null,
     supportingMaterials:  supportingMaterials?.trim() || null,
+    attachments:          attachments ?? [],
   });
 
   await TicketComment.create({

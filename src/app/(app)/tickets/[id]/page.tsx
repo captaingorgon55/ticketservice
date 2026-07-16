@@ -47,6 +47,7 @@ interface TicketDetail {
   baseText?: string | null;
   mustInclude?: string | null;
   supportingMaterials?: string | null;
+  attachments?: { name: string; url: string; type: string }[];
 }
 
 // ── Helpers ─────────────────────────────────────────
@@ -255,6 +256,24 @@ export default function TicketDetailPage() {
                     <LinkIcon size={11} /> Información de apoyo
                   </p>
                   <p className="text-sm text-gray-700 whitespace-pre-wrap">{ticket.supportingMaterials}</p>
+                </div>
+              )}
+              {ticket.attachments && ticket.attachments.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-1">📎 Archivos adjuntos</p>
+                  <div className="flex flex-wrap gap-2">
+                    {ticket.attachments.map((a, i) => (
+                      <a
+                        key={i}
+                        href={a.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 hover:bg-red-50 hover:border-red-200 hover:text-red-700 transition"
+                      >
+                        📎 {a.name}
+                      </a>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

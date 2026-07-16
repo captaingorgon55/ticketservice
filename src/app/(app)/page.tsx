@@ -166,9 +166,22 @@ function StatCard({
 
 // ── Create Ticket Modal ──────────────────────────────
 
+async function uploadToCloudinary(file: File): Promise<{ name: string; url: string; type: string }> {
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+  const preset    = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+  if (!cloudName || !preset) throw new Error("Cloudinary no configurado");
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("upload_preset", preset);
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, { method: "POST", body: fd });
+  if (!res.ok) throw new Error("Error al subir archivo");
+  const data = await res.json() as { secure_url: string };
+  return { name: file.name, url: data.secure_url, type: file.type };
+}
+
 function CreateTicketModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
-  const [tab, setTab] = useState<"interno" | "solicitud">("interno");
+  const [tab, setTab] = useState<"im" | "redes">("im");
   const [error, setError] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -179,6 +192,8 @@ function CreateTicketModal({ onClose }: { onClose: () => void }) {
   const [baseText, setBaseText] = useState("");
   const [mustInclude, setMustInclude] = useState("");
   const [supportingMaterials, setSupportingMaterials] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   const { data: session } = useSession();
   const role = (session?.user as { role?: string })?.role;
@@ -200,20 +215,33 @@ function CreateTicketModal({ onClose }: { onClose: () => void }) {
     onError: (e: Error) => setError(e.message),
   });
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const titleVal = tab === "solicitud" ? (journalistName ? `${title} — ${journalistName}` : title) : title;
+    const titleVal = tab === "redes" ? (journalistName ? `${title} — ${journalistName}` : title) : title;
     if (!titleVal.trim() || !description.trim()) {
       setError("Título y descripción son obligatorios");
       return;
+    }
+    let attachments: { name: string; url: string; type: string }[] = [];
+    if (files.length > 0) {
+      setUploading(true);
+      try {
+        attachments = await Promise.all(files.map(uploadToCloudinary));
+      } catch {
+        setError("Error al subir archivos. Verifica la configuración de Cloudinary.");
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
     }
     createMut.mutate({
       title: titleVal.trim(),
       description: description.trim(),
       category,
-      source: tab === "solicitud" ? "solicitud_publicacion" : "interna",
+      source: tab === "redes" ? "solicitud_publicacion" : "interna",
       assignedTo: assignedTo || null,
-      ...(tab === "solicitud" && {
+      attachments,
+      ...(tab === "redes" && {
         journalistName: journalistName.trim() || null,
         strategicTiming: strategicTiming.trim() || null,
         baseText: baseText.trim() || null,
@@ -231,7 +259,7 @@ function CreateTicketModal({ onClose }: { onClose: () => void }) {
           <p className="text-sm text-gray-400 mt-0.5">Crea una solicitud interna o de publicación</p>
         </div>
         <div className="flex border-b border-gray-100 px-6">
-          {(["interno", "solicitud"] as const).map((t) => (
+          {(["im", "redes"] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -240,37 +268,37 @@ function CreateTicketModal({ onClose }: { onClose: () => void }) {
                 tab === t ? "border-red-600 text-red-700" : "border-transparent text-gray-500 hover:text-gray-700"
               }`}
             >
-              {t === "interno" ? "📋 Ticket Interno" : "✍️ Solicitud de Publicación"}
+              {t === "im" ? "📊 Solicitud IM" : "📱 Solicitud Redes"}
             </button>
           ))}
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {tab === "solicitud" ? "Nombre del requerimiento *" : "Título *"}
+              {tab === "redes" ? "Nombre del requerimiento *" : "Título *"}
             </label>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder={tab === "solicitud" ? "Ej: Reforma laboral, Especial Colombia +20" : "Ej: Analizar tendencia de suscripciones Q3"}
+              placeholder={tab === "redes" ? "Ej: Despliegue Política, Carrusel Fin de semana" : "Ej: Despliegue Política, Carrusel Fin de semana"}
               className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
               required
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {tab === "solicitud" ? "¿Qué queremos comunicar? *" : "Descripción *"}
+              {tab === "redes" ? "¿Qué queremos comunicar? *" : "Descripción *"}
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder={tab === "solicitud" ? "Describe el objetivo de la publicación y el mensaje principal." : "Describe la solicitud en detalle."}
+              placeholder={tab === "redes" ? "Describe el objetivo de la publicación y el mensaje principal." : "Describe la solicitud en detalle."}
               rows={4}
               className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
               required
             />
           </div>
-          {tab === "solicitud" && (
+          {tab === "redes" && (
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del periodista solicitante</label>
@@ -315,6 +343,27 @@ function CreateTicketModal({ onClose }: { onClose: () => void }) {
               </div>
             )}
           </div>
+          {/* Adjuntos */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Archivos adjuntos</label>
+            <input
+              type="file"
+              multiple
+              onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+              className="w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-red-50 file:text-red-700 hover:file:bg-red-100"
+            />
+            {files.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {files.map((f, i) => (
+                  <li key={i} className="flex items-center justify-between text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded">
+                    <span className="truncate">{f.name}</span>
+                    <button type="button" onClick={() => setFiles(files.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 ml-2">✕</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           {error && (
             <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
               <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
@@ -325,9 +374,9 @@ function CreateTicketModal({ onClose }: { onClose: () => void }) {
             <button type="button" onClick={onClose} className="px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition">
               Cancelar
             </button>
-            <button type="submit" disabled={createMut.isPending} className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition disabled:opacity-50 flex items-center gap-2">
-              {createMut.isPending && <Loader2 size={14} className="animate-spin" />}
-              {createMut.isPending ? "Creando…" : tab === "solicitud" ? "Enviar Solicitud" : "Crear Ticket"}
+            <button type="submit" disabled={createMut.isPending || uploading} className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition disabled:opacity-50 flex items-center gap-2">
+              {(createMut.isPending || uploading) && <Loader2 size={14} className="animate-spin" />}
+              {uploading ? "Subiendo archivos…" : createMut.isPending ? "Creando…" : tab === "redes" ? "Enviar Solicitud" : "Crear Solicitud"}
             </button>
           </div>
         </form>
